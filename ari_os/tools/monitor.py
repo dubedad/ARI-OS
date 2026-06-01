@@ -1,0 +1,80 @@
+"""ARI-OS local web monitor — System 7 styled dashboard.
+
+`python3 -m ari_os.tools.monitor` serves http://localhost:7777, reading
+~/.ari-os state and rendering a classic Mac OS 7 control panel. Stdlib only.
+"""
+from __future__ import annotations
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from . import state as _state
+
+PORT = 7777
+
+_CSS = """
+body{background:#bbbbbb;font-family:Chicago,'ChicagoFLF',system-ui,sans-serif;
+  color:#000;margin:0;padding:24px;}
+.window{background:#fff;border:2px solid #000;box-shadow:2px 2px 0 #000;
+  max-width:560px;margin:0 auto;}
+.title-bar{background:repeating-linear-gradient(#000 0 1px,#fff 1px 2px);
+  border-bottom:2px solid #000;padding:3px 8px;display:flex;align-items:center;}
+.title-bar .name{background:#fff;padding:0 8px;font-weight:bold;}
+.body{padding:12px;}
+.row{display:flex;justify-content:space-between;border:1px solid #000;
+  padding:6px 8px;margin:4px 0;background:#fff;}
+.s-running{font-weight:bold;}
+.s-blocked{background:#000;color:#fff;}
+.s-done{color:#555;}
+.q{border:2px solid #000;background:#fff;padding:8px;margin-top:8px;}
+"""
+
+
+def load_state() -> dict:
+    qdir = _state.state_dir() / "questions"
+    return {"workers": _state.read_workers(),
+            "questions": [p.stem for p in sorted(qdir.glob("*.md"))]}
+
+
+def render_html(state: dict) -> str:
+    rows = []
+    for w in state.get("workers", []):
+        st = w.get("status", "?")
+        rows.append(
+            f'<div class="row s-{st}"><span>{w.get("label","")}</span>'
+            f'<span>{st}</span></div>')
+    body = "".join(rows) or '<div class="row"><span>no workers</span></div>'
+    qs = state.get("questions", [])
+    qhtml = ""
+    if qs:
+        items = "".join(f"<div>⚠ {q} needs an answer</div>" for q in qs)
+        qhtml = f'<div class="q"><b>Questions</b>{items}</div>'
+    return (f"<!doctype html><html><head><meta charset='utf-8'>"
+            f"<meta http-equiv='refresh' content='3'>"
+            f"<title>ARI-OS</title><style>{_CSS}</style></head><body>"
+            f"<div class='window'><div class='title-bar'>"
+            f"<span class='name'>ARI-OS Monitor</span></div>"
+            f"<div class='body'>{body}{qhtml}</div></div></body></html>")
+
+
+class _Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        html = render_html(load_state()).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(html)
+
+    def log_message(self, *a):
+        pass
+
+
+def main() -> None:
+    srv = HTTPServer(("127.0.0.1", PORT), _Handler)
+    print(f"Monitor live at http://localhost:{PORT}")
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        srv.shutdown()
+
+
+if __name__ == "__main__":
+    main()
