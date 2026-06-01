@@ -1,5 +1,6 @@
 import re, subprocess
 from ari_os.tools import dispatch
+from ari_os.tools import state as _state
 
 
 def test_worker_id_shape():
@@ -32,3 +33,19 @@ def test_is_repo_root(tmp_path):
     assert dispatch.is_repo_root(str(tmp_path)) is True
     sub = tmp_path / "sub"; sub.mkdir()
     assert dispatch.is_repo_root(str(sub)) is False
+
+
+def test_questions_round_trip(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    (tmp_path / "questions").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "questions" / "w-ab12-foo.md").write_text(
+        "Decision: jwt vs hex?\nDefault: hex")
+    class A: pass
+    dispatch.cmd_questions(A())
+    out = capsys.readouterr().out
+    assert "w-ab12-foo" in out and "jwt vs hex" in out
+
+
+def test_compose_answer_bakes_in():
+    t = dispatch.compose_answer_task("orig task", "use hex")
+    assert "orig task" in t and "use hex" in t and "baked in" in t
