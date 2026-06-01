@@ -4,7 +4,7 @@
 ~/.ari-os state and rendering a classic Mac OS 7 control panel. Stdlib only.
 """
 from __future__ import annotations
-import json
+import html as _html
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from . import state as _state
 
@@ -37,15 +37,20 @@ def load_state() -> dict:
 def render_html(state: dict) -> str:
     rows = []
     for w in state.get("workers", []):
-        st = w.get("status", "?")
+        st_raw = w.get("status", "?")
+        st_class = st_raw if st_raw in {"running", "blocked", "done"} else "unknown"
+        label = _html.escape(w.get("label", ""), quote=True)
+        st = _html.escape(st_raw, quote=True)
         rows.append(
-            f'<div class="row s-{st}"><span>{w.get("label","")}</span>'
+            f'<div class="row s-{st_class}"><span>{label}</span>'
             f'<span>{st}</span></div>')
     body = "".join(rows) or '<div class="row"><span>no workers</span></div>'
     qs = state.get("questions", [])
     qhtml = ""
     if qs:
-        items = "".join(f"<div>⚠ {q} needs an answer</div>" for q in qs)
+        items = "".join(
+            f"<div>&#x26A0; {_html.escape(q, quote=True)} needs an answer</div>"
+            for q in qs)
         qhtml = f'<div class="q"><b>Questions</b>{items}</div>'
     return (f"<!doctype html><html><head><meta charset='utf-8'>"
             f"<meta http-equiv='refresh' content='3'>"
