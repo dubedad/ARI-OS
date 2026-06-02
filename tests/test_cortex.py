@@ -122,3 +122,17 @@ def test_dn_rerank_demotes_duplicates_at_high_alpha():
     assert ids.index(3) < ids.index(2)
     low = cortex.dn_rerank([dict(r) for r in rows], alpha=0.0)
     assert [r["id"] for r in low] == [1, 2, 3]      # no suppression → original order
+
+def test_mode_changes_ordering(tmp_path):
+    conn = cortex.connect(str(tmp_path / "c.db"))
+    # Three dup rows + one unique row with moderate salience.
+    # focus (low alpha=0.2): dup rows stay near top.
+    # wide (high alpha=3.0): dup cross-suppression promotes the unique row.
+    cortex.remember(conn, "deploy plan alpha", context="p", tags="dup", salience=1.0)
+    cortex.remember(conn, "deploy plan beta", context="p", tags="dup", salience=0.9)
+    cortex.remember(conn, "deploy plan gamma", context="p", tags="dup", salience=0.8)
+    cortex.remember(conn, "deploy summary unique", context="p", tags="sum", salience=0.5)
+    focus = [r["id"] for r in cortex.recall(conn, "deploy", context="p", mode="focus")]
+    wide = [r["id"] for r in cortex.recall(conn, "deploy", context="p", mode="wide")]
+    assert focus != wide                      # diversity knob actually bites
+    assert set(focus) == set(wide)            # same set, only order differs
