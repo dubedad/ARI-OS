@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS memory (
   salience REAL NOT NULL DEFAULT 0.0,
   vector TEXT
 );
-CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(text, context, tags);
+CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(text, context, tags, tokenize="unicode61 tokenchars '-'");
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS wander_state (session TEXT PRIMARY KEY, count INTEGER, next_at INTEGER);
 """
@@ -39,3 +39,15 @@ def connect(db_path_str: str | None = None) -> sqlite3.Connection:
     conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1')")
     conn.commit()
     return conn
+
+def remember(conn, text, *, context="", tags="", source="", salience=0.0, vector=None) -> int:
+    cur = conn.execute(
+        "INSERT INTO memory(ts, context, text, tags, source, salience, vector) "
+        "VALUES (?,?,?,?,?,?,?)",
+        (time.time(), context, text, tags, source, float(salience),
+         json.dumps(vector) if vector is not None else None))
+    mid = cur.lastrowid
+    conn.execute("INSERT INTO memory_fts(rowid, text, context, tags) VALUES (?,?,?,?)",
+                 (mid, text, context, tags))
+    conn.commit()
+    return mid
