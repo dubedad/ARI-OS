@@ -38,3 +38,39 @@ def consolidate(conn, *, now=None) -> dict:
             decayed += 1
     conn.commit()
     return {"deduped": deduped, "decayed": decayed}
+
+
+def _dup(a, b) -> bool:
+    if a["text"].strip().lower() == b["text"].strip().lower():
+        return True
+    if a.get("vector") and b.get("vector"):
+        from .embed import cosine
+        return cosine(json.loads(a["vector"]), json.loads(b["vector"])) >= 0.92
+    return False
+
+
+def audit(conn) -> list:
+    ids = [r[0] for r in conn.execute("SELECT id FROM memory ORDER BY id").fetchall()]
+    full = [cortex._row(conn, mid) for mid in ids]
+    out = []
+    orphans = [r["id"] for r in full if not r["tags"].strip() and not r["context"].strip()]
+    if orphans:
+        out.append({"kind": "orphan", "ids": orphans,
+                    "detail": f"{len(orphans)} memories with no tags or context"})
+    clustered = set()
+    for i, a in enumerate(full):
+        if a["id"] in clustered:
+            continue
+        grp = [a["id"]]
+        for b in full[i + 1:]:
+            if b["id"] not in clustered and _dup(a, b):
+                grp.append(b["id"]); clustered.add(b["id"])
+        if len(grp) > 1:
+            clustered.add(a["id"])
+            out.append({"kind": "duplicate_cluster", "ids": grp,
+                        "detail": f"{len(grp)} similar memories could merge"})
+    total = conn.execute("SELECT count(*) FROM memory").fetchone()[0]
+    if total > BLOAT_LIMIT:
+        out.append({"kind": "bloat", "ids": [],
+                    "detail": f"{total} memories over the {BLOAT_LIMIT} soft cap"})
+    return out
