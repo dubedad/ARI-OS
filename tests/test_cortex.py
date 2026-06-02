@@ -36,3 +36,25 @@ def test_remember_stores_vector_as_json(tmp_path):
     raw = conn.execute("SELECT vector FROM memory WHERE id=?", (mid,)).fetchone()[0]
     import json as _j
     assert _j.loads(raw) == [0.1, 0.2, 0.3]
+
+import time as _t
+
+def test_recency_decay_halves_each_half_life():
+    now = 1_000_000.0
+    assert abs(cortex.recency_decay(now, now=now) - 1.0) < 1e-9
+    older = now - 30 * 86400
+    assert abs(cortex.recency_decay(older, now=now) - 0.5) < 1e-6
+
+def test_recall_ranks_by_match(tmp_path):
+    conn = cortex.connect(str(tmp_path / "c.db"))
+    cortex.remember(conn, "blue-green deploy rollout strategy", tags="ops")
+    cortex.remember(conn, "the cat sat on the mat")
+    out = cortex.recall(conn, "deploy", limit=5)
+    assert out and out[0]["text"].startswith("blue-green")
+
+def test_recall_salience_breaks_ties(tmp_path):
+    conn = cortex.connect(str(tmp_path / "c.db"))
+    low = cortex.remember(conn, "deploy notes alpha", salience=0.0)
+    high = cortex.remember(conn, "deploy notes beta", salience=5.0)
+    out = cortex.recall(conn, "deploy notes", limit=5)
+    assert out[0]["id"] == high

@@ -40,6 +40,53 @@ def connect(db_path_str: str | None = None) -> sqlite3.Connection:
     conn.commit()
     return conn
 
+def recency_decay(ts, now=None, half_life_days=30.0) -> float:
+    now = time.time() if now is None else now
+    age_days = max(0.0, (now - ts) / 86400.0)
+    return 0.5 ** (age_days / half_life_days)
+
+def _minmax(d: dict) -> dict:
+    if not d:
+        return {}
+    lo, hi = min(d.values()), max(d.values())
+    if hi - lo < 1e-12:
+        return {k: 1.0 for k in d}
+    return {k: (v - lo) / (hi - lo) for k, v in d.items()}
+
+def _fts_query(query: str) -> str:
+    # Safe MATCH: quote each term, OR them. Avoids FTS5 syntax errors on punctuation.
+    terms = [t for t in "".join(c if c.isalnum() else " " for c in query).split() if t]
+    return " OR ".join(f'"{t}"' for t in terms) or '""'
+
+def _lexical_hits(conn, query, scope_ids=None) -> dict:
+    rows = conn.execute(
+        "SELECT rowid, bm25(memory_fts) FROM memory_fts WHERE memory_fts MATCH ?",
+        (_fts_query(query),)).fetchall()
+    hits = {rid: -score for rid, score in rows}          # -bm25 → higher is better
+    if scope_ids is not None:
+        hits = {k: v for k, v in hits.items() if k in scope_ids}
+    return hits
+
+def _row(conn, mid) -> dict:
+    r = conn.execute(
+        "SELECT id, ts, context, text, tags, source, salience FROM memory WHERE id=?",
+        (mid,)).fetchone()
+    keys = ("id", "ts", "context", "text", "tags", "source", "salience")
+    return dict(zip(keys, r))
+
+def recall(conn, query, *, context="", mode="default", wide=False, limit=10, embedder=None):
+    now = time.time()
+    lex = _minmax(_lexical_hits(conn, query))
+    base = {}
+    for mid, lex_n in lex.items():
+        r = _row(conn, mid)
+        base[mid] = lex_n * (1.0 + r["salience"]) * recency_decay(r["ts"], now=now)
+    ranked = sorted(base, key=base.get, reverse=True)[:limit]
+    out = []
+    for mid in ranked:
+        r = _row(conn, mid); r["score"] = base[mid]; out.append(r)
+    return out
+
 def remember(conn, text, *, context="", tags="", source="", salience=0.0, vector=None) -> int:
     cur = conn.execute(
         "INSERT INTO memory(ts, context, text, tags, source, salience, vector) "
