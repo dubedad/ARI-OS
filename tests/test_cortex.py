@@ -58,3 +58,21 @@ def test_recall_salience_breaks_ties(tmp_path):
     high = cortex.remember(conn, "deploy notes beta", salience=5.0)
     out = cortex.recall(conn, "deploy notes", limit=5)
     assert out[0]["id"] == high
+
+def test_gate_tunnels_to_context(tmp_path):
+    conn = cortex.connect(str(tmp_path / "c.db"))
+    a = cortex.remember(conn, "deploy runbook", context="proj-a")
+    cortex.remember(conn, "deploy runbook", context="proj-b")
+    out = cortex.recall(conn, "deploy", context="proj-a")
+    assert [r["id"] for r in out] == [a]            # proj-b never appears
+
+def test_gate_wide_crosses_only_on_consent(tmp_path):
+    conn = cortex.connect(str(tmp_path / "c.db"))
+    cortex.remember(conn, "deploy runbook", context="proj-a")
+    cortex.remember(conn, "deploy runbook", context="proj-b")
+    assert len(cortex.recall(conn, "deploy", context="proj-a")) == 1
+    assert len(cortex.recall(conn, "deploy", context="proj-a", wide=True)) == 2
+
+def test_thin_coverage_flags_sparse_result():
+    assert cortex.thin_coverage([{"id": 1}], floor=3) is True
+    assert cortex.thin_coverage([{"id": i} for i in range(5)], floor=3) is False

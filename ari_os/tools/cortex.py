@@ -74,9 +74,19 @@ def _row(conn, mid) -> dict:
     keys = ("id", "ts", "context", "text", "tags", "source", "salience")
     return dict(zip(keys, r))
 
+def _scope_ids(conn, context, wide):
+    if wide or not context:
+        return None                       # no scoping
+    rows = conn.execute("SELECT id FROM memory WHERE context=?", (context,)).fetchall()
+    return {r[0] for r in rows}
+
+def thin_coverage(results, floor=3) -> bool:
+    return len(results) < floor
+
 def recall(conn, query, *, context="", mode="default", wide=False, limit=10, embedder=None):
     now = time.time()
-    lex = _minmax(_lexical_hits(conn, query))
+    scope = _scope_ids(conn, context, wide)
+    lex = _minmax(_lexical_hits(conn, query, scope_ids=scope))
     base = {}
     for mid, lex_n in lex.items():
         r = _row(conn, mid)
