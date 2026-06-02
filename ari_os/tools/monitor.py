@@ -30,12 +30,15 @@ def current_theme() -> str:
 
 def body_background(theme: str) -> str:
     img = THEMES.get(theme, THEMES[DEFAULT_THEME])
-    return f"background-image:{img};background-size:4px 4px,100% 100%;"
+    # Pin to the viewport so the fill gradient never tiles below short content;
+    # only the 4px stipple repeats.
+    return (f"background-image:{img};background-size:4px 4px,100% 100%;"
+            f"background-repeat:repeat,no-repeat;background-attachment:fixed;")
 
 
 _CSS = """
 body{font-family:Chicago,'ChicagoFLF',system-ui,sans-serif;
-  color:#000;margin:0;padding:24px;}
+  color:#000;margin:0;padding:24px;min-height:100vh;box-sizing:border-box;}
 .window{background:#fff;border:2px solid #000;box-shadow:2px 2px 0 #000;
   max-width:560px;margin:0 auto;}
 .title-bar{background:repeating-linear-gradient(#000 0 1px,#fff 1px 2px);
