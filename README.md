@@ -1,52 +1,100 @@
-# ARI-OS
+```
+┌──────────────────────────────────────────────────────────┐
+│ ▢  ░░░░░░░░░░░░░░░░░░░  A R I · O S  ░░░░░░░░░░░░░░░░░░░░│
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│   An orchestrator-first operating layer for              │
+│   Claude Code. Your main seat stays the advisor          │
+│   — the focused work runs in the shadows.                │
+│                                                          │
+│   brainstorm → plan → dispatch → watch → ship            │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
 
-An orchestrator-first operating layer for Claude Code:
+Pure Python standard library. No third-party dependencies.
 
-**brainstorm → plan → dispatch background workers → watch → review → ship.**
-
-Your main session stays an *advisor* — focused work runs in cheap background
-workers you watch in a little System 7 dashboard. ARI-OS is pure Python
-standard library: no third-party dependencies.
+```
+        ┌───────────┐     ┌───────────┐
+        │ BRAINSTORM│ ──→ │   PLAN    │
+        └───────────┘     └─────┬─────┘
+                                │
+        ┌───────────┐     ┌─────▼─────┐
+        │  REVIEW   │ ←── │ DISPATCH  │
+        └─────┬─────┘     └─────┬─────┘
+              │                 │ background workers
+              │           ┌─────▼─────┐
+              │           │  MONITOR  │  localhost:7777
+              ▼           └───────────┘
+        ┌───────────┐
+        │   SHIP    │
+        └───────────┘
+```
 
 ## Install
 
-```bash
-python3 install.py
+```
+┌─ INSTALL ────────────────────────────────────────────────┐
+│ python3 install.py        easy wizard                    │
+│ read SETUP.md             advanced / by hand             │
+│                                                          │
+│ backed up · reversible · idempotent                      │
+└──────────────────────────────────────────────────────────┘
 ```
 
-That copies the skills + commands into your Claude Code directory, registers a
-status line, and adds a short managed block to your `CLAUDE.md`. Every change is
-**backed up and recorded** — it is fully reversible.
+```bash
+python3 install.py          # or: "read SETUP.md and set this up"
+```
 
-Prefer to do it by hand (or have your assistant do it)? Read **[SETUP.md](SETUP.md)**.
+Copies the skills + commands into your Claude Code directory, registers a
+status line, and adds a short managed block to your `CLAUDE.md`. Every change is
+**backed up and recorded** — fully reversible. See **[SETUP.md](SETUP.md)** for
+the manual path.
 
 ## What you get
 
-- **Skills** — `brainstorm` (spec-first ideation), `handoff` (resume a session
-  cold), `advisor` (dispatch background workers), `teach` (optional tips).
-- **Commands** — `/brainstorm`, `/handoff`, `/dispatch`, `/monitor`.
-- **Dispatcher** — `python3 -m ari_os.tools.dispatch start --executor sonnet
-  --task-file BRIEF.md --cwd <dir> --label <name>`.
-- **Monitor** — `python3 -m ari_os.tools.monitor` → http://localhost:7777. A
-  System 7 dashboard of running / blocked / done workers, with a live gradient
-  color picker (top-right).
-- **Status line** — `ctx% · model · dir · branch · 🛠workers · clock`.
+```
+┌─ WHAT YOU GET ───────────────────────────────────────────┐
+│ skills    brainstorm · handoff · advisor · teach         │
+│ commands  /brainstorm /handoff /dispatch /monitor        │
+│ dispatch  detached background workers                    │
+│ monitor   System 7 dashboard + color picker              │
+│ status    ctx% · model · branch · workers · clock        │
+└──────────────────────────────────────────────────────────┘
+```
+
+Dispatch a worker and watch it:
+
+```bash
+python3 -m ari_os.tools.dispatch start --executor sonnet \
+    --task-file BRIEF.md --cwd <dir> --label <name>
+python3 -m ari_os.tools.monitor          # http://localhost:7777
+```
 
 ## Control panel
 
-```bash
-python3 -m ari_os.tools.arios keys            # which provider keys resolve
-python3 -m ari_os.tools.arios theme stipple   # monitor background theme
-python3 -m ari_os.tools.arios toggle teach on # turn a feature on/off
-python3 -m ari_os.tools.arios update          # in-place update
+```
+┌─ CONTROL PANEL  (arios) ─────────────────────────────────┐
+│ arios keys              which provider keys resolve      │
+│ arios theme stipple     monitor background               │
+│ arios toggle teach on   flip a feature                   │
+│ arios update            in-place update                  │
+└──────────────────────────────────────────────────────────┘
 ```
 
-## Update / revert / uninstall
-
 ```bash
-python3 install.py --update      # refresh in place; keeps your keys + config
-python3 install.py --revert      # undo the last change
-python3 install.py --uninstall   # remove everything ARI-OS added
+python3 -m ari_os.tools.arios keys
+python3 -m ari_os.tools.arios theme stipple
+```
+
+## Lifecycle
+
+```
+┌─ LIFECYCLE ──────────────────────────────────────────────┐
+│ install.py --update     refresh; keeps keys + config     │
+│ install.py --revert     undo the last change             │
+│ install.py --uninstall  remove everything               │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ## Keys
