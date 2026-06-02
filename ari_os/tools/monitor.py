@@ -56,7 +56,7 @@ body{font-family:Chicago,'ChicagoFLF',system-ui,sans-serif;
 
 def load_state() -> dict:
     qdir = _state.state_dir() / "questions"
-    return {"workers": _state.read_workers(),
+    return {"workers": _state.reconcile(),
             "questions": [p.stem for p in sorted(qdir.glob("*.md"))]}
 
 

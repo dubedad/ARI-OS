@@ -72,7 +72,7 @@ def cmd_start(a) -> None:
 
 
 def cmd_list(a) -> None:
-    for w in state.read_workers():
+    for w in state.reconcile():
         print(f"{w['id']:32} {w['status']:10} {w.get('label','')}")
 
 
