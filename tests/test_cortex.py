@@ -76,3 +76,12 @@ def test_gate_wide_crosses_only_on_consent(tmp_path):
 def test_thin_coverage_flags_sparse_result():
     assert cortex.thin_coverage([{"id": 1}], floor=3) is True
     assert cortex.thin_coverage([{"id": i} for i in range(5)], floor=3) is False
+
+def test_cli_remember_then_recall(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    cortex.main(["remember", "blue-green deploy", "--context", "proj-a", "--tags", "ops"])
+    mid_line = capsys.readouterr().out.strip()
+    assert mid_line.isdigit()
+    cortex.main(["recall", "deploy", "--context", "proj-a"])
+    out = capsys.readouterr().out
+    assert "blue-green deploy" in out

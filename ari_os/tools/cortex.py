@@ -97,6 +97,31 @@ def recall(conn, query, *, context="", mode="default", wide=False, limit=10, emb
         r = _row(conn, mid); r["score"] = base[mid]; out.append(r)
     return out
 
+def main(argv=None) -> None:
+    ap = argparse.ArgumentParser(prog="cortex")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    r = sub.add_parser("remember"); r.add_argument("text")
+    r.add_argument("--context", default=""); r.add_argument("--tags", default="")
+    r.add_argument("--source", default=""); r.add_argument("--salience", type=float, default=0.0)
+    q = sub.add_parser("recall"); q.add_argument("query")
+    q.add_argument("--context", default=""); q.add_argument("--mode", default="default")
+    q.add_argument("--wide", action="store_true"); q.add_argument("--limit", type=int, default=10)
+    a = ap.parse_args(argv)
+    conn = connect()
+    if a.cmd == "remember":
+        print(remember(conn, a.text, context=a.context, tags=a.tags,
+                       source=a.source, salience=a.salience))
+    elif a.cmd == "recall":
+        hits = recall(conn, a.query, context=a.context, mode=a.mode,
+                      wide=a.wide, limit=a.limit)
+        for h in hits:
+            print(f"[{h['id']}] ({h['context'] or '-'}) {h['text']}")
+        if a.context and not a.wide and thin_coverage(hits):
+            print("local context thin — add --wide (or say 'go wide') to search everything")
+
+if __name__ == "__main__":
+    main()
+
 def remember(conn, text, *, context="", tags="", source="", salience=0.0, vector=None) -> int:
     cur = conn.execute(
         "INSERT INTO memory(ts, context, text, tags, source, salience, vector) "
