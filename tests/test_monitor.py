@@ -43,3 +43,10 @@ def test_unknown_theme_falls_back_to_default():
 def test_render_honors_explicit_theme():
     html = monitor.render_html({"workers": [], "questions": []}, theme="stipple")
     assert "#C8A8E9" in html
+
+
+def test_render_includes_gradient_color_picker():
+    html = monitor.render_html({"workers": [], "questions": []})
+    assert 'type="color"' in html        # picker present
+    assert "localStorage" in html        # choice persists across refresh
+    assert "linear-gradient" in html     # recolors the dithered gradient

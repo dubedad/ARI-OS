@@ -51,6 +51,37 @@ body{font-family:Chicago,'ChicagoFLF',system-ui,sans-serif;
 .s-blocked{background:#000;color:#fff;}
 .s-done{color:#555;}
 .q{border:2px solid #000;background:#fff;padding:8px;margin-top:8px;}
+.picker{position:fixed;top:12px;right:12px;background:#fff;border:2px solid #000;
+  box-shadow:2px 2px 0 #000;padding:4px 8px;font-size:12px;font-weight:bold;}
+.picker input{vertical-align:middle;margin-left:6px;}
+"""
+
+# Client-side gradient picker: recolors the dithered wallpaper from a chosen
+# hue and remembers it in localStorage (survives the 3s auto-refresh).
+_PICKER = """
+<div class="picker">BG<input type="color" id="bg" value="#C8A8E9"></div>
+<script>
+(function(){
+  function lighten(hex,amt){
+    var n=parseInt(hex.slice(1),16),r=n>>16&255,g=n>>8&255,b=n&255;
+    r=Math.round(r+(255-r)*amt);g=Math.round(g+(255-g)*amt);b=Math.round(b+(255-b)*amt);
+    return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+  }
+  function apply(hex){
+    document.body.style.backgroundImage=
+      'radial-gradient(circle at 0 0,rgba(255,255,255,0.5) 1px,transparent 1.5px),'+
+      'linear-gradient(180deg,'+lighten(hex,0.35)+' 0%,'+hex+' 100%)';
+    document.body.style.backgroundSize='4px 4px,100% 100%';
+    document.body.style.backgroundRepeat='repeat,no-repeat';
+    document.body.style.backgroundAttachment='fixed';
+  }
+  var input=document.getElementById('bg');
+  var saved=localStorage.getItem('ariosBg');
+  if(saved){input.value=saved;apply(saved);}
+  input.addEventListener('input',function(){
+    localStorage.setItem('ariosBg',input.value);apply(input.value);});
+})();
+</script>
 """
 
 
@@ -85,7 +116,7 @@ def render_html(state: dict, theme: str | None = None) -> str:
             f"</head><body>"
             f"<div class='window'><div class='title-bar'>"
             f"<span class='name'>ARI-OS Monitor</span></div>"
-            f"<div class='body'>{body}{qhtml}</div></div></body></html>")
+            f"<div class='body'>{body}{qhtml}</div></div>{_PICKER}</body></html>")
 
 
 class _Handler(BaseHTTPRequestHandler):
