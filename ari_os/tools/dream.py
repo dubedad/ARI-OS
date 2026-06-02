@@ -74,3 +74,18 @@ def audit(conn) -> list:
         out.append({"kind": "bloat", "ids": [],
                     "detail": f"{total} memories over the {BLOAT_LIMIT} soft cap"})
     return out
+
+
+def summarise(texts):
+    try:
+        from .ask import call_model, get_key
+        get_key("anthropic")            # probe; SystemExit if no key
+    except SystemExit:
+        return None
+    except Exception:
+        return None
+    joined = "\n- ".join(texts)
+    try:
+        return call_model("haiku", f"Summarise these related notes in one line:\n- {joined}", None)
+    except Exception:
+        return None
