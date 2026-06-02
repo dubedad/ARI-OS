@@ -83,14 +83,31 @@ def _scope_ids(conn, context, wide):
 def thin_coverage(results, floor=3) -> bool:
     return len(results) < floor
 
+def _vector_hits(conn, qvec, scope_ids=None):
+    from .embed import cosine
+    rows = conn.execute("SELECT id, vector FROM memory WHERE vector IS NOT NULL").fetchall()
+    hits = {}
+    for mid, vraw in rows:
+        if scope_ids is not None and mid not in scope_ids:
+            continue
+        hits[mid] = cosine(qvec, json.loads(vraw))
+    return hits
+
 def recall(conn, query, *, context="", mode="default", wide=False, limit=10, embedder=None):
     now = time.time()
     scope = _scope_ids(conn, context, wide)
     lex = _minmax(_lexical_hits(conn, query, scope_ids=scope))
+    vec = {}
+    if embedder is not None:
+        qvec = embedder(query)
+        if qvec:
+            vec = _minmax(_vector_hits(conn, qvec, scope_ids=scope))
+    alpha_cos = 1.0
     base = {}
-    for mid, lex_n in lex.items():
+    for mid in set(lex) | set(vec):
         r = _row(conn, mid)
-        base[mid] = lex_n * (1.0 + r["salience"]) * recency_decay(r["ts"], now=now)
+        blended = lex.get(mid, 0.0) + alpha_cos * vec.get(mid, 0.0)
+        base[mid] = blended * (1.0 + r["salience"]) * recency_decay(r["ts"], now=now)
     ranked = sorted(base, key=base.get, reverse=True)[:limit]
     out = []
     for mid in ranked:

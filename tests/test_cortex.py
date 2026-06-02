@@ -85,3 +85,20 @@ def test_cli_remember_then_recall(tmp_path, monkeypatch, capsys):
     cortex.main(["recall", "deploy", "--context", "proj-a"])
     out = capsys.readouterr().out
     assert "blue-green deploy" in out
+
+def test_hybrid_recalls_paraphrase_with_no_shared_keywords(tmp_path):
+    conn = cortex.connect(str(tmp_path / "c.db"))
+    # fake embedder: map known strings to vectors; "automobile" ~ "car"
+    vecs = {"the car is red": [1.0, 0.0], "a sweet dessert": [0.0, 1.0],
+            "automobile": [0.95, 0.05]}
+    fake = lambda t: vecs.get(t, [0.0, 0.0])
+    cortex.remember(conn, "the car is red", vector=fake("the car is red"))
+    cortex.remember(conn, "a sweet dessert", vector=fake("a sweet dessert"))
+    out = cortex.recall(conn, "automobile", embedder=fake, limit=2)
+    assert out[0]["text"] == "the car is red"     # recalled with zero shared keywords
+
+def test_lexical_still_works_without_embedder(tmp_path):
+    conn = cortex.connect(str(tmp_path / "c.db"))
+    cortex.remember(conn, "blue-green deploy")
+    out = cortex.recall(conn, "deploy")            # embedder=None
+    assert out and out[0]["text"] == "blue-green deploy"
