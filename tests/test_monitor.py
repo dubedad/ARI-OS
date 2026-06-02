@@ -21,3 +21,23 @@ def test_render_handles_empty():
     html = monitor.render_html({"workers": [], "questions": []})
     assert "<html" in html.lower()
     assert "ARI-OS" in html
+
+
+def test_themes_share_stipple_style_but_differ_in_palette():
+    beige = monitor.body_background("beige")
+    stipple = monitor.body_background("stipple")
+    assert beige != stipple
+    # both use the System 7 stipple style
+    assert "radial-gradient" in beige and "radial-gradient" in stipple
+    assert "background-size:4px 4px" in beige and "background-size:4px 4px" in stipple
+    # stipple carries the aris-space lavender->pink palette
+    assert "#C8A8E9" in stipple and "#F2B8DC" in stipple
+
+
+def test_unknown_theme_falls_back_to_default():
+    assert monitor.body_background("nope") == monitor.body_background(monitor.DEFAULT_THEME)
+
+
+def test_render_honors_explicit_theme():
+    html = monitor.render_html({"workers": [], "questions": []}, theme="stipple")
+    assert "#C8A8E9" in html

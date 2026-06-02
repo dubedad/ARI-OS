@@ -5,13 +5,36 @@
 """
 from __future__ import annotations
 import html as _html
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from . import state as _state
 
 PORT = 7777
+DEFAULT_THEME = "beige"
+
+# Both themes share the System 7 stipple style (a 4px dot pattern over a
+# vertical gradient); only the palette differs. `stipple` is the aris-space
+# wallpaper. Selected via $ARI_OS_MONITOR_THEME or the control panel.
+THEMES = {
+    "beige": ("radial-gradient(circle at 0 0,rgba(255,255,255,0.4) 1px,transparent 1.5px),"
+              "linear-gradient(180deg,#D6D2C4 0%,#C9C4B8 100%)"),
+    "stipple": ("radial-gradient(circle at 0 0,rgba(255,255,255,0.5) 1px,transparent 1.5px),"
+                "linear-gradient(180deg,#C8A8E9 0%,#F2B8DC 100%)"),
+}
+
+
+def current_theme() -> str:
+    t = os.environ.get("ARI_OS_MONITOR_THEME", DEFAULT_THEME)
+    return t if t in THEMES else DEFAULT_THEME
+
+
+def body_background(theme: str) -> str:
+    img = THEMES.get(theme, THEMES[DEFAULT_THEME])
+    return f"background-image:{img};background-size:4px 4px,100% 100%;"
+
 
 _CSS = """
-body{background:#bbbbbb;font-family:Chicago,'ChicagoFLF',system-ui,sans-serif;
+body{font-family:Chicago,'ChicagoFLF',system-ui,sans-serif;
   color:#000;margin:0;padding:24px;}
 .window{background:#fff;border:2px solid #000;box-shadow:2px 2px 0 #000;
   max-width:560px;margin:0 auto;}
@@ -34,7 +57,8 @@ def load_state() -> dict:
             "questions": [p.stem for p in sorted(qdir.glob("*.md"))]}
 
 
-def render_html(state: dict) -> str:
+def render_html(state: dict, theme: str | None = None) -> str:
+    theme = theme if theme in THEMES else current_theme()
     rows = []
     for w in state.get("workers", []):
         st_raw = w.get("status", "?")
@@ -54,7 +78,8 @@ def render_html(state: dict) -> str:
         qhtml = f'<div class="q"><b>Questions</b>{items}</div>'
     return (f"<!doctype html><html><head><meta charset='utf-8'>"
             f"<meta http-equiv='refresh' content='3'>"
-            f"<title>ARI-OS</title><style>{_CSS}</style></head><body>"
+            f"<title>ARI-OS</title><style>{_CSS}\nbody{{{body_background(theme)}}}</style>"
+            f"</head><body>"
             f"<div class='window'><div class='title-bar'>"
             f"<span class='name'>ARI-OS Monitor</span></div>"
             f"<div class='body'>{body}{qhtml}</div></div></body></html>")
