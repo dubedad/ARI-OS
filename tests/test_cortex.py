@@ -102,3 +102,23 @@ def test_lexical_still_works_without_embedder(tmp_path):
     cortex.remember(conn, "blue-green deploy")
     out = cortex.recall(conn, "deploy")            # embedder=None
     assert out and out[0]["text"] == "blue-green deploy"
+
+def test_modes_table_has_three():
+    assert set(cortex.MODES) == {"focus", "default", "wide"}
+    assert cortex.MODES["focus"]["wander"] is False
+    assert cortex.MODES["wide"]["dn_strength"] > cortex.MODES["focus"]["dn_strength"]
+
+def test_dn_rerank_demotes_duplicates_at_high_alpha():
+    # three rows: two near-identical high scorers (shared tag), one unique slightly lower
+    rows = [
+        {"id": 1, "score": 1.00, "context": "p", "tags": "dup", "vector": None},
+        {"id": 2, "score": 0.98, "context": "p", "tags": "dup", "vector": None},
+        {"id": 3, "score": 0.95, "context": "p", "tags": "unique", "vector": None},
+    ]
+    high = cortex.dn_rerank([dict(r) for r in rows], alpha=5.0)
+    # the unique row should rise above the second near-duplicate
+    # (with strong same-context sim=0.5, row3 rises to top; assert it beats row2)
+    ids = [r["id"] for r in high]
+    assert ids.index(3) < ids.index(2)
+    low = cortex.dn_rerank([dict(r) for r in rows], alpha=0.0)
+    assert [r["id"] for r in low] == [1, 2, 3]      # no suppression → original order

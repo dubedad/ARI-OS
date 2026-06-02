@@ -69,9 +69,9 @@ def _lexical_hits(conn, query, scope_ids=None) -> dict:
 
 def _row(conn, mid) -> dict:
     r = conn.execute(
-        "SELECT id, ts, context, text, tags, source, salience FROM memory WHERE id=?",
+        "SELECT id, ts, context, text, tags, source, salience, vector FROM memory WHERE id=?",
         (mid,)).fetchone()
-    keys = ("id", "ts", "context", "text", "tags", "source", "salience")
+    keys = ("id", "ts", "context", "text", "tags", "source", "salience", "vector")
     return dict(zip(keys, r))
 
 def _scope_ids(conn, context, wide):
@@ -82,6 +82,31 @@ def _scope_ids(conn, context, wide):
 
 def thin_coverage(results, floor=3) -> bool:
     return len(results) < floor
+
+MODES = {
+    "focus":   {"dn_strength": 0.2, "wander": False},
+    "default": {"dn_strength": 1.0, "wander": True},
+    "wide":    {"dn_strength": 3.0, "wander": True},
+}
+
+def _sim(a, b) -> float:
+    if a.get("vector") and b.get("vector"):
+        from .embed import cosine
+        return max(0.0, cosine(json.loads(a["vector"]), json.loads(b["vector"])))
+    if a.get("context") and a.get("context") == b.get("context"):
+        share = set(a.get("tags", "").split()) & set(b.get("tags", "").split())
+        return 1.0 if share else 0.5
+    return 1.0 if set(a.get("tags", "").split()) & set(b.get("tags", "").split()) else 0.0
+
+def dn_rerank(rows, alpha, sigma=1.0):
+    out = []
+    for i, ri in enumerate(rows):
+        suppression = sum(_sim(ri, rj) * rj["score"]
+                          for j, rj in enumerate(rows) if j != i)
+        ri = dict(ri); ri["score"] = ri["score"] / (sigma + alpha * suppression)
+        out.append(ri)
+    out.sort(key=lambda r: r["score"], reverse=True)
+    return out
 
 def _vector_hits(conn, qvec, scope_ids=None):
     from .embed import cosine
@@ -108,11 +133,12 @@ def recall(conn, query, *, context="", mode="default", wide=False, limit=10, emb
         r = _row(conn, mid)
         blended = lex.get(mid, 0.0) + alpha_cos * vec.get(mid, 0.0)
         base[mid] = blended * (1.0 + r["salience"]) * recency_decay(r["ts"], now=now)
-    ranked = sorted(base, key=base.get, reverse=True)[:limit]
-    out = []
-    for mid in ranked:
-        r = _row(conn, mid); r["score"] = base[mid]; out.append(r)
-    return out
+    scored = []
+    for mid in base:
+        r = _row(conn, mid); r["score"] = base[mid]; scored.append(r)
+    alpha = MODES.get(mode, MODES["default"])["dn_strength"]
+    reranked = dn_rerank(scored, alpha)
+    return reranked[:limit]
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="cortex")
