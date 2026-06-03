@@ -24,3 +24,12 @@ def test_morning_focus_falls_back_to_recent(tmp_path):
     conn = cortex.connect(str(tmp_path / "c.db"))
     cortex.remember(conn, "only note", context="p")
     assert routines.morning(conn, context="p")["suggested_focus"] == "only note"
+
+def test_night_consolidates_audits_and_carries_forward(tmp_path):
+    conn = cortex.connect(str(tmp_path / "c.db"))
+    cortex.remember(conn, "dup", context="p"); cortex.remember(conn, "dup", context="p")
+    cortex.remember(conn, "carry me", context="p", tags="open")
+    out = routines.night(conn, context="p")
+    assert out["consolidation"]["deduped"] == 1          # exact dup collapsed
+    assert "carry me" in out["carry_forward"]
+    assert any(r["text"] == "carry me" for r in out["captured_today"])

@@ -41,3 +41,19 @@ def morning(conn, context="") -> dict:
     else:
         focus = None
     return {"recent": recent, "open_loops": loops, "suggested_focus": focus}
+
+def night(conn, context="") -> dict:
+    rep = dream.consolidate(conn)
+    suggestions = dream.audit(conn)
+    cutoff = time.time() - 86400
+    if context:
+        rows = conn.execute(
+            "SELECT id FROM memory WHERE context=? AND ts>=? ORDER BY ts",
+            (context, cutoff)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id FROM memory WHERE ts>=? ORDER BY ts", (cutoff,)).fetchall()
+    captured = [cortex._row(conn, r[0]) for r in rows]
+    carry_forward = [r["text"] for r in open_loops(conn, context)]
+    return {"consolidation": rep, "audit": suggestions,
+            "captured_today": captured, "carry_forward": carry_forward}
