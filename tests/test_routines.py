@@ -33,3 +33,10 @@ def test_night_consolidates_audits_and_carries_forward(tmp_path):
     assert out["consolidation"]["deduped"] == 1          # exact dup collapsed
     assert "carry me" in out["carry_forward"]
     assert any(r["text"] == "carry me" for r in out["captured_today"])
+
+def test_cli_morning_prints_focus(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    conn = cortex.connect(str(tmp_path / "cortex.db"))
+    cortex.remember(conn, "ship it", context="p", tags="open", salience=1.0); conn.close()
+    routines.main(["morning", "--context", "p"])
+    assert "ship it" in capsys.readouterr().out

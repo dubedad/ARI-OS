@@ -57,3 +57,35 @@ def night(conn, context="") -> dict:
     carry_forward = [r["text"] for r in open_loops(conn, context)]
     return {"consolidation": rep, "audit": suggestions,
             "captured_today": captured, "carry_forward": carry_forward}
+
+def _print_rows(label, rows):
+    print(f"{label}:")
+    for r in rows:
+        print(f"  - {r['text']}")
+
+def main(argv=None) -> None:
+    ap = argparse.ArgumentParser(prog="routines")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    m = sub.add_parser("morning"); m.add_argument("--context", default="")
+    n = sub.add_parser("night"); n.add_argument("--context", default="")
+    a = ap.parse_args(argv)
+    conn = cortex.connect()
+    if a.cmd == "morning":
+        r = morning(conn, a.context)
+        _print_rows("Recent", r["recent"])
+        _print_rows("Open loops", r["open_loops"])
+        print(f"Suggested focus: {r['suggested_focus'] or '(none)'}")
+    elif a.cmd == "night":
+        r = night(conn, a.context)
+        print(f"Consolidated: deduped {r['consolidation']['deduped']}, "
+              f"decayed {r['consolidation']['decayed']}")
+        print("Audit:")
+        for s in r["audit"]:
+            print(f"  - {s['kind']}: {s['detail']}")
+        _print_rows("Captured today", r["captured_today"])
+        print("Carry forward:")
+        for t in r["carry_forward"]:
+            print(f"  - {t}")
+
+if __name__ == "__main__":
+    main()
