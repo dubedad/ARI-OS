@@ -20,3 +20,24 @@ def open_loops(conn, context="") -> list:
         rows = conn.execute(
             "SELECT id FROM memory WHERE (' '||tags||' ') LIKE ?", (like,)).fetchall()
     return [cortex._row(conn, r[0]) for r in rows]
+
+def _recent(conn, context="", limit=5) -> list:
+    if context:
+        rows = conn.execute(
+            "SELECT id FROM memory WHERE context=? ORDER BY ts DESC LIMIT ?",
+            (context, limit)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id FROM memory ORDER BY ts DESC LIMIT ?", (limit,)).fetchall()
+    return [cortex._row(conn, r[0]) for r in rows]
+
+def morning(conn, context="") -> dict:
+    recent = _recent(conn, context, limit=5)
+    loops = open_loops(conn, context)
+    if loops:
+        focus = max(loops, key=lambda r: r["salience"])["text"]
+    elif recent:
+        focus = recent[0]["text"]
+    else:
+        focus = None
+    return {"recent": recent, "open_loops": loops, "suggested_focus": focus}
