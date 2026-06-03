@@ -97,3 +97,8 @@ def test_install_is_idempotent(tmp_path, monkeypatch):
     before = (cdir / "CLAUDE.md").read_text()
     install.apply(install.plan_actions(repo), dry_run=False)
     assert (cdir / "CLAUDE.md").read_text() == before
+
+def test_claude_body_mentions_brain():
+    body = install.CLAUDE_BODY
+    for needle in ("remember", "recall", "dream", "/morning", "/night"):
+        assert needle in body

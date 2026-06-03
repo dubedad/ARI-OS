@@ -14,7 +14,9 @@ END = "<!-- ARI-OS:end -->"
 CLAUDE_BODY = ("# ARI-OS\n"
                "Orchestrator-first workflow: brainstorm -> plan -> dispatch "
                "background workers -> watch -> review -> ship.\n"
-               "Skills: brainstorm, handoff, advisor, teach. "
+               "Skills: brainstorm, handoff, advisor, teach, remember, recall, dream. "
+               "Memory: `python3 -m ari_os.tools.cortex recall \"<query>\"` / "
+               "`remember \"<note>\"`. Routines: /morning, /night. "
                "Monitor: `python3 -m ari_os.tools.monitor`.")
 
 
