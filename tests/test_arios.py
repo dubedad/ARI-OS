@@ -48,7 +48,7 @@ def test_cortex_mode_and_wander(tmp_path, monkeypatch):
 
 def test_cortex_status_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
-    assert arios.cortex_status() == {"embeddings": "auto", "mode": "default", "wander": True}
+    assert arios.cortex_status() == {"embeddings": "auto", "mode": "default", "wander": True, "ears": False, "lens": False}
 
 def test_cli_cortex_sets_and_status(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
@@ -56,3 +56,17 @@ def test_cli_cortex_sets_and_status(tmp_path, monkeypatch, capsys):
     assert arios.load_config()["cortex"]["mode"] == "focus"
     arios.main(["cortex", "status"])
     assert "focus" in capsys.readouterr().out
+
+def test_cortex_ears_lens_toggles(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    arios.main(["cortex", "ears", "on"])
+    arios.main(["cortex", "lens", "on"])
+    cfg = arios.load_config()["cortex"]
+    assert cfg["ears"] is True and cfg["lens"] is True
+    status = arios.cortex_status()
+    assert status["ears"] is True and status["lens"] is True
+
+def test_cortex_status_defaults_ears_lens_off(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    status = arios.cortex_status()
+    assert status["ears"] is False and status["lens"] is False

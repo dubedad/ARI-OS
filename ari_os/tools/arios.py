@@ -70,11 +70,23 @@ def set_wander(on: bool) -> None:
     cfg.setdefault("cortex", {})["wander"] = bool(on)
     save_config(cfg)
 
+def set_ears(on: bool) -> None:
+    cfg = load_config()
+    cfg.setdefault("cortex", {})["ears"] = bool(on)
+    save_config(cfg)
+
+def set_lens(on: bool) -> None:
+    cfg = load_config()
+    cfg.setdefault("cortex", {})["lens"] = bool(on)
+    save_config(cfg)
+
 def cortex_status() -> dict:
     c = load_config().get("cortex", {})
     return {"embeddings": c.get("embeddings", "auto"),
             "mode": c.get("mode", "default"),
-            "wander": c.get("wander", True)}
+            "wander": c.get("wander", True),
+            "ears": c.get("ears", False),
+            "lens": c.get("lens", False)}
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="arios")
@@ -87,7 +99,7 @@ def main(argv=None) -> None:
     sub.add_parser("keys")
     sub.add_parser("update")
     cx = sub.add_parser("cortex")
-    cx.add_argument("setting", choices=["embeddings", "mode", "wander", "status"])
+    cx.add_argument("setting", choices=["embeddings", "mode", "wander", "ears", "lens", "status"])
     cx.add_argument("value", nargs="?")
     a = ap.parse_args(argv)
     if a.cmd == "theme":
@@ -113,6 +125,10 @@ def main(argv=None) -> None:
             set_mode(a.value); print(f"mode -> {a.value}")
         elif a.setting == "wander":
             set_wander(a.value == "on"); print(f"wander -> {a.value}")
+        elif a.setting == "ears":
+            set_ears(a.value == "on"); print(f"ears -> {a.value}")
+        elif a.setting == "lens":
+            set_lens(a.value == "on"); print(f"lens -> {a.value}")
 
 
 if __name__ == "__main__":
