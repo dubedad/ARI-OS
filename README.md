@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/icon.png" alt="ARI-OS" width="360">
+</p>
+
 ```
 ┌──────────────────────────────────────────────────────────┐
 │ ▢  ░░░░░░░░░░░░░░░░░░░  A R I · O S  ░░░░░░░░░░░░░░░░░░░░│
@@ -27,7 +31,7 @@ keep your own session free to think and steer, and **watch every worker in a
 little dashboard** until it is done. You stop being the typist and become the
 director.
 
-Three ideas make that work, and ARI-OS ships all three as installable pieces:
+Four ideas make that work, and ARI-OS ships all four as installable pieces:
 
 1. **Spec-first thinking.** Talk an idea into a short written spec before any code
    exists, so the work has a target.
@@ -35,6 +39,8 @@ Three ideas make that work, and ARI-OS ships all three as installable pieces:
    advising. The worker runs on its own; you review the result.
 3. **Continuity.** A handoff format lets a fresh session pick up cold with zero
    loss, so a long job survives across days.
+4. **A memory.** A local brain (Cortex) the workflow writes to and reads from, so
+   work builds on what past sessions decided instead of starting cold.
 
 ## The shift
 
@@ -96,6 +102,44 @@ taste, and deciding what "done" means.
   best-effort boxes for status.
 - **Status line** puts context %, model, branch, worker count, and the clock in
   your footer.
+
+## Memory (the light brain)
+
+ARI-OS ships a local brain called **Cortex**. It lives on your own machine
+(`~/.ari-os/cortex.db`), it is pure standard library, and it makes the workflow
+build on what you have already decided instead of starting every session cold.
+
+- **`/remember`** saves a decision, fact, or open thread.
+- **`/recall`** pulls the relevant past context before you answer. It **tunnels to
+  the project you are in** by default and only widens when you say so, so it is not
+  dredging your whole history on every question.
+- **`/dream`** consolidates the brain: it dedups and decays old notes and suggests
+  tidy-ups. It never deletes a real memory without you.
+- **`/morning`** opens a session with your recent threads, open loops, and a
+  suggested focus.
+- **`/night`** consolidates, reviews what you captured, and writes a carry-forward
+  so tomorrow resumes cleanly.
+
+Three modes (`focus`, `default`, `wide`) tune how broad recall is, and every so
+often the brain surfaces a tangential memory from outside your current focus, a
+deliberate re-orientation that is off in `focus`.
+
+**Recall works with zero setup** (ranked keyword search, standard library). If an
+embeddings key or a local model is available, it quietly upgrades to semantic
+recall too. No extra install either way.
+
+### Optional: audio and video (EARS / LENS)
+
+Off by default. Enable them at install or in the control panel, and Cortex can
+take in media as memories: **EARS** turns an audio file into a transcript, **LENS**
+turns a video into frame captions. Both use a tool or key you already have, and
+the core brain never depends on them.
+
+```bash
+python3 -m ari_os.tools.arios cortex status     # current memory settings
+python3 -m ari_os.tools.arios cortex mode wide  # broaden recall
+python3 -m ari_os.tools.arios cortex ears on    # enable audio ingest
+```
 
 ## A typical loop
 
