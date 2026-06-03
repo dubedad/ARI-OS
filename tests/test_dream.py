@@ -56,3 +56,13 @@ def test_summarise_none_without_key(monkeypatch):
         raise SystemExit(1)
     monkeypatch.setattr(ask, "get_key", _no_key)
     assert dream.summarise(["note one", "note two"]) is None
+
+
+def test_dream_cli_prints_report(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    conn = cortex.connect(str(tmp_path / "cortex.db"))
+    cortex.remember(conn, "dup", context="p"); cortex.remember(conn, "dup", context="p")
+    conn.close()
+    dream.main([])
+    out = capsys.readouterr().out
+    assert "Consolidated" in out

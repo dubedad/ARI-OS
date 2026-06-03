@@ -6,7 +6,7 @@ suggestions (duplicate clusters, orphans, bloat). summarise() returns None unles
 a provider key is present. Stdlib only; the optional LLM step reuses ask.py.
 """
 from __future__ import annotations
-import json, time
+import argparse, json, time
 from . import cortex
 
 DECAY_HORIZON_DAYS = 90.0
@@ -89,3 +89,19 @@ def summarise(texts):
         return call_model("haiku", f"Summarise these related notes in one line:\n- {joined}", None)
     except Exception:
         return None
+
+
+def main(argv=None) -> None:
+    import argparse
+    ap = argparse.ArgumentParser(prog="dream")
+    ap.add_argument("--audit-only", action="store_true")
+    a = ap.parse_args(argv)
+    conn = cortex.connect()
+    if not a.audit_only:
+        rep = consolidate(conn)
+        print(f"Consolidated: deduped {rep['deduped']}, decayed {rep['decayed']}")
+    for s in audit(conn):
+        print(f"[{s['kind']}] {s['detail']}")
+
+if __name__ == "__main__":
+    main()
