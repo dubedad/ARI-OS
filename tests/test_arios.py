@@ -49,3 +49,10 @@ def test_cortex_mode_and_wander(tmp_path, monkeypatch):
 def test_cortex_status_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
     assert arios.cortex_status() == {"embeddings": "auto", "mode": "default", "wander": True}
+
+def test_cli_cortex_sets_and_status(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    arios.main(["cortex", "mode", "focus"])
+    assert arios.load_config()["cortex"]["mode"] == "focus"
+    arios.main(["cortex", "status"])
+    assert "focus" in capsys.readouterr().out

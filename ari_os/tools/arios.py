@@ -76,7 +76,7 @@ def cortex_status() -> dict:
             "mode": c.get("mode", "default"),
             "wander": c.get("wander", True)}
 
-def main() -> None:
+def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="arios")
     sub = ap.add_subparsers(dest="cmd", required=True)
     t = sub.add_parser("theme")
@@ -86,7 +86,10 @@ def main() -> None:
     tg.add_argument("state", choices=["on", "off"])
     sub.add_parser("keys")
     sub.add_parser("update")
-    a = ap.parse_args()
+    cx = sub.add_parser("cortex")
+    cx.add_argument("setting", choices=["embeddings", "mode", "wander", "status"])
+    cx.add_argument("value", nargs="?")
+    a = ap.parse_args(argv)
     if a.cmd == "theme":
         set_theme(a.name)
         print(f"Theme set to {a.name}.")
@@ -98,6 +101,18 @@ def main() -> None:
             print(f"{k:10} {v}")
     elif a.cmd == "update":
         subprocess.run([sys.executable, "-m", "ari_os.install", "--update"], check=False)
+    elif a.cmd == "cortex":
+        if a.setting == "status":
+            for k, v in cortex_status().items():
+                print(f"{k:11} {v}")
+        elif a.value is None:
+            ap.error(f"'cortex {a.setting}' needs a value")
+        elif a.setting == "embeddings":
+            set_embeddings(a.value); print(f"embeddings -> {a.value}")
+        elif a.setting == "mode":
+            set_mode(a.value); print(f"mode -> {a.value}")
+        elif a.setting == "wander":
+            set_wander(a.value == "on"); print(f"wander -> {a.value}")
 
 
 if __name__ == "__main__":
