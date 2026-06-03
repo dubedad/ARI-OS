@@ -5,6 +5,9 @@ import argparse, json, os, subprocess, sys
 from .. import paths
 from . import monitor
 from .ask import ENV_VARS
+from .cortex import MODES
+
+EMBEDDINGS_CHOICES = ("auto", "google", "ollama", "off")
 
 
 def _config_path():
@@ -47,6 +50,31 @@ def keys_status() -> dict:
         out[provider] = "present" if os.environ.get(env) else "missing"
     return out
 
+
+def set_embeddings(provider: str) -> None:
+    if provider not in EMBEDDINGS_CHOICES:
+        raise ValueError(f"Unknown embeddings provider: {provider}. One of {EMBEDDINGS_CHOICES}")
+    cfg = load_config()
+    cfg.setdefault("cortex", {})["embeddings"] = provider
+    save_config(cfg)
+
+def set_mode(mode: str) -> None:
+    if mode not in MODES:
+        raise ValueError(f"Unknown mode: {mode}. One of {sorted(MODES)}")
+    cfg = load_config()
+    cfg.setdefault("cortex", {})["mode"] = mode
+    save_config(cfg)
+
+def set_wander(on: bool) -> None:
+    cfg = load_config()
+    cfg.setdefault("cortex", {})["wander"] = bool(on)
+    save_config(cfg)
+
+def cortex_status() -> dict:
+    c = load_config().get("cortex", {})
+    return {"embeddings": c.get("embeddings", "auto"),
+            "mode": c.get("mode", "default"),
+            "wander": c.get("wander", True)}
 
 def main() -> None:
     ap = argparse.ArgumentParser(prog="arios")

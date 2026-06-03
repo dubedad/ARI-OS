@@ -28,3 +28,24 @@ def test_keys_status_never_prints_value(tmp_path, monkeypatch):
     status = arios.keys_status()
     assert status["anthropic"] in ("present", "missing")
     assert "sk-secret-xyz" not in repr(status)
+
+
+def test_cortex_embeddings_validates(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    arios.set_embeddings("ollama")
+    assert arios.load_config()["cortex"]["embeddings"] == "ollama"
+    with pytest.raises(ValueError):
+        arios.set_embeddings("nonsense")
+
+def test_cortex_mode_and_wander(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    arios.set_mode("wide")
+    arios.set_wander(False)
+    cfg = arios.load_config()["cortex"]
+    assert cfg["mode"] == "wide" and cfg["wander"] is False
+    with pytest.raises(ValueError):
+        arios.set_mode("not-a-mode")
+
+def test_cortex_status_defaults(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path))
+    assert arios.cortex_status() == {"embeddings": "auto", "mode": "default", "wander": True}
