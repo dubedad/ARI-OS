@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "neutral": true,
+  "description": "Neutral seed for region anchors — one-hot vectors in R^7 (one axis per published region). Ships uncalibrated; calibration is rebuilt locally via region_anchors.py rebuild-anchors. Public cognitive-science region names preserved.",
+  "model": "nomic-embed-text",
+  "default_beta": 0.0,
+  "betas": [0.0, 0.15, 0.3, 0.5],
+  "n_queries": 0,
+  "templates": {
+    "wernicke": [
+      "what was said in that conversation",
+      "the exact words used previously",
+      "what the user asked for last time",
+      "the request made about this tool",
+      "the prior phrasing in this thread"
+    ],
+    "broca": [
+      "how this was explained previously",
+      "the phrasing used in the prior answer",
+      "the earlier response wording",
+      "the assistant's explanation of the design",
+      "the wording of the past reply"
+    ],
+    "occipital": [
+      "the visual composition of this frame",
+      "colour grade and contrast of the reference",
+      "the look and feel of the scene",
+      "describe the image layout",
+      "mood board references for the scene"
+    ],
+    "parietal": [
+      "current state of the workspace",
+      "what was decided for this project",
+      "the project context and manifest",
+      "where this workspace is at right now",
+      "the overview of the repository structure"
+    ],
+    "hippocampus": [
+      "what happened in the last session",
+      "the ship report for that feature",
+      "when did the migration run",
+      "the brief for the campaign",
+      "what was shipped recently"
+    ],
+    "vmpfc": [
+      "the preferred response format",
+      "the rules about committing this code",
+      "what matters in this decision",
+      "the voice and identity guidelines",
+      "feedback about how to work"
+    ],
+    "frontoparietal": [
+      "how to run the test suite",
+      "the command line to rebuild the index",
+      "the steps to dispatch a worker",
+      "how this skill is invoked",
+      "the procedure for the deploy"
+    ]
+  },
+  "anchors": {
+    "wernicke": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "broca": [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "occipital": [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+    "parietal": [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+    "hippocampus": [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+    "vmpfc": [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+    "frontoparietal": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+  },
+  "calibration": {
+    "0.00": {
+      "wernicke": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "broca": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "occipital": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "parietal": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "hippocampus": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "vmpfc": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "frontoparietal": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0}
+    },
+    "0.15": {
+      "wernicke": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "broca": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "occipital": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "parietal": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "hippocampus": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "vmpfc": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "frontoparietal": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0}
+    },
+    "0.30": {
+      "wernicke": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "broca": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "occipital": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "parietal": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "hippocampus": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "vmpfc": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "frontoparietal": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0}
+    },
+    "0.50": {
+      "wernicke": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "broca": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "occipital": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "parietal": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "hippocampus": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "vmpfc": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0},
+      "frontoparietal": {"mu": 0.0, "sigma": 1.0, "n_chunks": 0}
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "neutral": true,
+  "description": "Neutral seed for task-type centroids — untrained prior: all six task-type centroids are the zero vector, so every query scores 0.0 cosine against every centroid and the classifier abstains with low_confidence=True. Calibration is rebuilt locally via task_classifier.py rebuild-centroids, which replaces the zero vector per task-type with the mean of the locked seed-query embeddings for that task.",
+  "model": "nomic-embed-text",
+  "fallback": "reason",
+  "min_confidence": 0.18,
+  "tie_epsilon": 0.01,
+  "task_types": ["build", "voice", "ideate", "reason", "research", "visual"],
+  "seed_queries": {
+    "build": [
+      "fix the bug in this module",
+      "add a feature to the plugin",
+      "wire the poller as a child process",
+      "merge the branch onto main",
+      "write a unit test for the classifier"
+    ],
+    "voice": [
+      "draft a post in this voice",
+      "rewrite this caption in that voice",
+      "rewrite the summary in a consistent voice",
+      "brand-check this copy",
+      "write the about page in a consistent voice"
+    ],
+    "ideate": [
+      "brainstorm names for the plugin",
+      "fresh angle for this piece",
+      "riff on the region-council idea",
+      "creative direction for the shoot",
+      "concept ideas for the visual identity"
+    ],
+    "reason": [
+      "should we flip this switch on",
+      "is this the right metric to use",
+      "work through the worktree tangle",
+      "floor or blend for vmpfc",
+      "decompose this architecture tradeoff"
+    ],
+    "research": [
+      "what do we know about Global Workspace Theory",
+      "summarize the prior art on this",
+      "recall the prior findings",
+      "state of the brain schema",
+      "find prior work on this"
+    ],
+    "visual": [
+      "describe this card",
+      "the look of this frame",
+      "image prompt for the scene",
+      "analyze the colour grade",
+      "visual references for the mood"
+    ]
+  },
+  "centroids": {
+    "build": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "voice": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "ideate": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "reason": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "research": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "visual": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  }
+}
