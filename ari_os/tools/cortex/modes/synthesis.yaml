@@ -1,0 +1,29 @@
+name: synthesis
+description: Cross-domain synthesis — balanced wide retrieval, KG expansion on, all tiers weighted evenly.
+region_weights:
+  vmpfc: 1.6
+  frontoparietal: 1.4
+  wernicke: 1.2
+  broca: 1.2
+  occipital: 1.1
+  parietal: 1.3
+  hippocampus: 1.2
+tier_weights:
+  0: 1.1
+  1: 1.0
+  2: 1.0
+  3: 1.0
+  4: 1.1
+k_vector: 18
+k_adjacent: 8
+k_kg: 6
+kg_expand: true
+token_budget: 5500
+fsrs_enabled: true
+wander:
+  enabled: true
+  divergence: 0.6
+  cadence_min: 4
+  cadence_max: 8
+dn_strength: 1.2
+dn_sigma: 1.0

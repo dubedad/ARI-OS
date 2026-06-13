@@ -1,0 +1,24 @@
+name: recall
+description: Episodic recall — strong hippocampus + wernicke weighting to surface past decisions and conversations.
+region_weights:
+  vmpfc: 1.0
+  frontoparietal: 0.9
+  wernicke: 1.8
+  broca: 1.3
+  occipital: 0.7
+  parietal: 0.8
+  hippocampus: 2.0
+tier_weights:
+  0: 1.3
+  1: 1.1
+  2: 1.0
+  3: 0.9
+  4: 0.8
+k_vector: 14
+k_adjacent: 6
+k_kg: 4
+kg_expand: false
+token_budget: 4500
+fsrs_enabled: true
+dn_strength: 0.4
+dn_sigma: 1.0

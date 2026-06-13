@@ -1,0 +1,24 @@
+name: visual
+description: Visual-first retrieval — strongly upweights occipital chunks; visual cards dominate top-K on visual queries.
+region_weights:
+  vmpfc: 0.8
+  frontoparietal: 0.9
+  wernicke: 0.8
+  broca: 0.7
+  occipital: 2.5
+  parietal: 1.0
+  hippocampus: 0.8
+tier_weights:
+  0: 1.0
+  1: 1.0
+  2: 1.0
+  3: 1.0
+  4: 1.0
+k_vector: 14
+k_adjacent: 6
+k_kg: 4
+kg_expand: false
+token_budget: 4500
+fsrs_enabled: true
+dn_strength: 0.4
+dn_sigma: 1.0

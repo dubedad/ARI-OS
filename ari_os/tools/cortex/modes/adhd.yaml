@@ -1,0 +1,39 @@
+name: adhd
+description: ADHD-high-DMN retrieval — flat competition, wide ignition, fatigue-driven rapid coalition turnover. Retrieval params mirror default.
+region_weights:
+  vmpfc: 1.5
+  frontoparietal: 1.2
+  wernicke: 1.0
+  broca: 1.0
+  occipital: 1.0
+  parietal: 1.0
+  hippocampus: 0.9
+tier_weights:
+  0: 1.0
+  1: 0.95
+  2: 0.9
+  3: 0.95
+  4: 1.1
+k_vector: 12
+k_adjacent: 6
+k_kg: 4
+kg_expand: false
+token_budget: 4000
+fsrs_enabled: true
+wander:
+  enabled: true
+  divergence: 0.3
+  cadence_min: 5
+  cadence_max: 10
+  divergence_min: 0.1
+  divergence_max: 0.6
+dn_strength: 0.3
+dn_sigma: 1.0
+council:
+  tau: 1.0
+  rho: 0.10
+  gamma: 1.0
+  lam: 0.75
+  epsilon: 0.10
+  dup_veto: 0.7
+  nu: 1.0

@@ -1,0 +1,31 @@
+name: creative
+description: Wide-net retrieval favouring vmpfc + occipital, deeper tier mix for associative leaps.
+region_weights:
+  vmpfc: 2.0
+  frontoparietal: 1.0
+  wernicke: 1.0
+  broca: 1.1
+  occipital: 1.5
+  parietal: 0.9
+  hippocampus: 1.1
+tier_weights:
+  0: 1.0
+  1: 1.0
+  2: 1.0
+  3: 1.2
+  4: 1.4
+k_vector: 16
+k_adjacent: 8
+k_kg: 6
+kg_expand: true
+token_budget: 5000
+fsrs_enabled: true
+wander:
+  enabled: true
+  divergence: 0.6
+  cadence_min: 4
+  cadence_max: 8
+  divergence_min: 0.3
+  divergence_max: 0.9
+dn_strength: 1.0
+dn_sigma: 1.0

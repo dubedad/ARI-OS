@@ -1,0 +1,26 @@
+name: focus
+description: Tight-focus retrieval — narrow k values, strong frontoparietal + parietal, minimal noise.
+region_weights:
+  vmpfc: 1.0
+  frontoparietal: 1.8
+  wernicke: 0.8
+  broca: 0.8
+  occipital: 0.6
+  parietal: 1.5
+  hippocampus: 0.7
+tier_weights:
+  0: 1.5
+  1: 1.2
+  2: 0.8
+  3: 0.6
+  4: 0.5
+k_vector: 8
+k_adjacent: 3
+k_kg: 2
+kg_expand: false
+token_budget: 2500
+fsrs_enabled: true
+wander:
+  enabled: false
+dn_strength: 0.2
+dn_sigma: 1.0

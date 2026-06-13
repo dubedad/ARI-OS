@@ -1,0 +1,35 @@
+structural:
+  skills:
+    brainstorming: creative
+    edit-brainstorm: creative
+    systematic-debugging: focus
+    executing-plans: focus
+    writing-plans: focus
+    subagent-driven-development: focus
+    render: visual
+    posts: visual
+    media: visual
+    iterative-depth: deep
+    first-principles: deep
+    council: synthesis
+    red-team: synthesis
+  cwd_substrings:
+    LENS_: visual
+inferred:
+  keywords:
+    recall:    ["what did i", "what did we", "last week", "remember when", "did i write"]
+    synthesis: ["connect", "relate", "bridge", "tie together", "how does this relate"]
+    focus:     ["fix", "bug", "error", "failing", "debug", "broken", "stack trace"]
+    visual:    ["palette", "lens", "frame", "photo", "thumbnail", "colour", "color"]
+    creative:  ["brainstorm", "what if", "imagine", "riff", "explore ideas"]
+    deep:      ["summarise", "summarize", "consolidate", "distill", "deep dive"]
+    global:    ["across workspaces", "all projects", "everywhere", "cross-workspace",
+                "every workspace", "compare with", "what else", "outside this"]
+
+posture:
+  overfetch_factor: 3
+  local_coverage_floor: 3
+  tunnel_dn_strength: 0.2
+  tunnel_dn_sigma: 1.0
+  global_dn_strength: 5.0
+  global_dn_sigma: 1.0
