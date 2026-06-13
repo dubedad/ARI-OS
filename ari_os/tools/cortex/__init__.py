@@ -5,11 +5,14 @@ index, transcript_filter. Embeddings (ar.t4): embed, similarity. Region
 seeds + task classifier (ar.t5): region_anchors, task_classifier,
 task_region_weights. Modes (ar.t6): mode_router, mode_routing, mode_state,
 modes. Retrieval (ar.t7): retrieve (hybrid FTS+vec, region rerank,
-divisive-norm, kg_expand). The rest (MCP, CLI) lands in later tasks.
+divisive-norm, kg_expand). Context assembly (ar.t8): context_assembler,
+context_block. The rest (MCP, CLI) lands in later tasks.
 """
 from . import (  # noqa: F401
     chunker,
     config,
+    context_assembler,
+    context_block,
     db,
     embed,
     index,
@@ -29,6 +32,8 @@ from .modes import loader as modes_loader  # noqa: F401
 __all__ = [
     "chunker",
     "config",
+    "context_assembler",
+    "context_block",
     "db",
     "embed",
     "index",
