@@ -4,7 +4,8 @@ Substrate (ar.t2): config, db, schema, vec_sidecar. Ingest (ar.t3): chunker,
 index, transcript_filter. Embeddings (ar.t4): embed, similarity. Region
 seeds + task classifier (ar.t5): region_anchors, task_classifier,
 task_region_weights. Modes (ar.t6): mode_router, mode_routing, mode_state,
-modes. The rest (retrieve, MCP) lands in later tasks per the heavy-core plan.
+modes. Retrieval (ar.t7): retrieve (hybrid FTS+vec, region rerank,
+divisive-norm, kg_expand). The rest (MCP, CLI) lands in later tasks.
 """
 from . import (  # noqa: F401
     chunker,
@@ -16,6 +17,7 @@ from . import (  # noqa: F401
     mode_routing,
     mode_state,
     region_anchors,
+    retrieve,
     similarity,
     task_classifier,
     task_region_weights,
@@ -35,6 +37,7 @@ __all__ = [
     "mode_state",
     "modes_loader",
     "region_anchors",
+    "retrieve",
     "similarity",
     "task_classifier",
     "task_region_weights",
