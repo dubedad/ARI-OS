@@ -5,6 +5,7 @@ install is zero-config.
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -60,3 +61,52 @@ USAGE_USED_LO = float(os.getenv("ARI_OS_USAGE_LO", "0.55"))
 USAGE_TS_WINDOW = int(os.getenv("ARI_OS_USAGE_WINDOW", "1800"))
 USAGE_RESPONSE_REGION = "broca"
 ZONES = ("persona", "episodic", "semantic")
+
+
+def runtime_config() -> dict:
+    """Load optional user config from ``$ARI_OS_HOME/config.json``.
+
+    Missing or malformed config is treated as empty config. The cortex core
+    must stay zero-config and fail-soft on SessionStart paths.
+    """
+    path = state_home() / "config.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _config_value(dotted_key: str):
+    data = runtime_config()
+    if dotted_key in data:
+        return data[dotted_key]
+    cur = data
+    for part in dotted_key.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return None
+        cur = cur[part]
+    return cur
+
+
+def config_bool(dotted_key: str, default: bool) -> bool:
+    value = _config_value(dotted_key)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
+def wander_enabled(default: bool = True) -> bool:
+    """Return the global ``cortex.wander`` toggle."""
+    env = os.environ.get("ARI_OS_WANDER")
+    if env is not None:
+        return env.strip().lower() in {"1", "true", "yes", "on"}
+    return config_bool("cortex.wander", default)
