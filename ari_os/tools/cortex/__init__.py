@@ -35,7 +35,27 @@ from . import (  # noqa: F401
 )
 from .modes import loader as modes_loader  # noqa: F401
 
+
+def _public_modes() -> tuple[str, ...]:
+    """Return the public mode set, including the legacy ``wide`` alias.
+
+    The control panel (``ari_os.tools.arios``) and the CLI's
+    ``arios cortex mode <name>`` subcommand both validate against this
+    set so users with an existing ``mode: wide`` in ``config.json``
+    do not see ``Unknown mode`` after upgrading to the heavy core.
+    ``wide`` was a light-cortex posture and is preserved here as a
+    thin alias to ``creative`` (its semantic neighbour) so a stored
+    config still loads and ``set_mode("wide")`` round-trips.
+    """
+    live = modes_loader.list_modes()
+    return tuple(sorted(set(live) | {"wide"}))
+
+
+MODES: tuple[str, ...] = _public_modes()
+
+
 __all__ = [
+    "MODES",
     "chunker",
     "config",
     "context_assembler",

@@ -37,7 +37,7 @@ MODES_DIR = REPO_ROOT / "ari_os" / "tools" / "cortex" / "modes"
 
 EXPECTED_MODES = tuple(sorted((
     "default", "creative", "deep", "recall", "synthesis",
-    "focus", "visual", "dyslexic", "adhd",
+    "focus", "visual", "dyslexic", "adhd", "wide",
 )))
 
 
