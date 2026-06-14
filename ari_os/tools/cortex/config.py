@@ -110,3 +110,11 @@ def wander_enabled(default: bool = True) -> bool:
     if env is not None:
         return env.strip().lower() in {"1", "true", "yes", "on"}
     return config_bool("cortex.wander", default)
+
+
+def fsrs_enabled(default: bool = True) -> bool:
+    """Return the global ``cortex.fsrs`` toggle."""
+    env = os.environ.get("ARI_OS_FSRS")
+    if env is not None:
+        return env.strip().lower() in {"1", "true", "yes", "on"}
+    return config_bool("cortex.fsrs", default)
