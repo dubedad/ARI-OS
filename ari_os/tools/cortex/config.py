@@ -142,3 +142,19 @@ def predictive_enabled(default: bool = True) -> bool:
     if env is not None:
         return env.strip().lower() in {"1", "true", "yes", "on"}
     return config_bool("cortex.predictive", default)
+
+
+def council_enabled(default: bool = False) -> bool:
+    """Return the global ``cortex.council`` toggle."""
+    env = os.environ.get("ARI_OS_COUNCIL")
+    if env is not None:
+        return env.strip().lower() in {"1", "true", "yes", "on"}
+    return config_bool("cortex.council", default)
+
+
+def kg_enabled(default: bool = False) -> bool:
+    """Return the global ``cortex.kg`` toggle."""
+    env = os.environ.get("ARI_OS_KG")
+    if env is not None:
+        return env.strip().lower() in {"1", "true", "yes", "on"}
+    return config_bool("cortex.kg", default)

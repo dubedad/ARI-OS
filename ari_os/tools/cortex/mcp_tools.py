@@ -128,6 +128,89 @@ def tracts(db_path: Path, *, n: int = 100) -> list:
     ]
 
 
+def entities(db_path: Path, *, kind: str | None = None, k: int = 50) -> list:
+    """Return KG entities ordered by mention count and confidence."""
+    from .db import connect
+
+    limit = max(1, int(k))
+    con = connect(db_path)
+    try:
+        if kind:
+            rows = con.execute(
+                """SELECT id, name, kind, confidence, mention_count
+                   FROM kg_entity
+                   WHERE kind = ?
+                   ORDER BY mention_count DESC, confidence DESC, name ASC
+                   LIMIT ?""",
+                (kind, limit),
+            ).fetchall()
+        else:
+            rows = con.execute(
+                """SELECT id, name, kind, confidence, mention_count
+                   FROM kg_entity
+                   ORDER BY mention_count DESC, confidence DESC, name ASC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+    finally:
+        con.close()
+    return [
+        {
+            "id": int(row[0]),
+            "name": row[1],
+            "kind": row[2],
+            "confidence": row[3],
+            "mention_count": row[4],
+        }
+        for row in rows
+    ]
+
+
+def relations(db_path: Path, *, entity: str | None = None, k: int = 50) -> list:
+    """Return KG relations, optionally constrained to one entity name."""
+    from .db import connect
+    from .kg.query import find_entity_by_name
+
+    limit = max(1, int(k))
+    params: tuple[object, ...]
+    where = ""
+    if entity:
+        hit = find_entity_by_name(db_path, entity)
+        if hit is None:
+            return []
+        where = "WHERE r.subject_id = ? OR r.object_id = ?"
+        params = (hit["id"], hit["id"], limit)
+    else:
+        params = (limit,)
+
+    con = connect(db_path)
+    try:
+        rows = con.execute(
+            f"""SELECT r.id, se.name, r.predicate, oe.name,
+                      r.confidence, r.evidence_count
+                 FROM kg_relation r
+                 JOIN kg_entity se ON se.id = r.subject_id
+                 JOIN kg_entity oe ON oe.id = r.object_id
+                 {where}
+                 ORDER BY r.evidence_count DESC, r.confidence DESC, r.id ASC
+                 LIMIT ?""",
+            params,
+        ).fetchall()
+    finally:
+        con.close()
+    return [
+        {
+            "id": int(row[0]),
+            "subject": row[1],
+            "predicate": row[2],
+            "object": row[3],
+            "confidence": row[4],
+            "evidence_count": row[5],
+        }
+        for row in rows
+    ]
+
+
 def modes(db_path: Path) -> list:
     """List mode YAML files from the modes/ directory beside the cortex package.
 

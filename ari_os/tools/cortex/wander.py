@@ -7,6 +7,7 @@ instead of direct query match.
 """
 from __future__ import annotations
 
+import os
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -180,10 +181,19 @@ def wander(
     divergence_min: float = 0.1,
     divergence_max: float = 0.9,
     enabled: bool | None = None,
+    session_id: str | None = None,
 ) -> WanderResult:
     """Pick one bounded associative memory plus up to two tangent chunks."""
     if enabled is False or (enabled is None and not config.wander_enabled(True)):
         return WanderResult(focus_ids=[], seed=None, divergence=divergence, fired=False)
+    if os.environ.get("ARI_OS_WANDER_YIELD") == "1" and session_id:
+        try:
+            from .council_marker import council_serving
+
+            if council_serving(session_id):
+                return WanderResult(focus_ids=[], seed=None, divergence=divergence, fired=False)
+        except Exception:
+            pass
 
     rng = random.Random(rng_seed)
     embed_client = embed_client or EmbedClient()

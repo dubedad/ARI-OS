@@ -31,6 +31,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import config
 from .config import ASSEMBLER_ENABLED
 from .db import connect
 from .embed import EmbedClient, pack_embedding
@@ -658,8 +659,8 @@ def retrieve(
         source_kind.setdefault(adj.chunk_id, "adjacent")
     all_ids = list(dict.fromkeys(seed_ids + sparse_ids + [a.chunk_id for a in adjacent]))
 
-    if _kge and seed_ids:
-        kg_chunks = kg_expand(db_path, seed_ids, per_seed=_kkg)
+    if _kge and seed_ids and config.kg_enabled(False):
+        kg_chunks = _kg_expand_impl(db_path, seed_ids, per_seed=_kkg)
         for kc in kg_chunks:
             if kc.chunk_id not in source_kind:
                 source_kind[kc.chunk_id] = "kg"
@@ -789,6 +790,16 @@ def retrieve(
         assembler_on=ASSEMBLER_ENABLED,
         latency_ms=(time.monotonic() - _t_start) * 1000.0,
     )
+    if session_id:
+        try:
+            from . import council, council_marker
+
+            council_marker.record_tier(
+                session_id,
+                "normal" if council.enabled() else "static",
+            )
+        except Exception:
+            pass
     update_hebbian_edges(db_path, returned_ids)
     return RetrievalResult(
         chunks=packed, query=query, mode=mode, cwd=cwd, branch=branch,

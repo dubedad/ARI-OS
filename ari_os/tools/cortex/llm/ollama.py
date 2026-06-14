@@ -14,6 +14,20 @@ _CONSOLIDATE_PROMPT = (
     "Be concise.\n\n{body}"
 )
 
+_EXTRACT_ENTITIES_PROMPT = """\
+Extract knowledge-graph candidates from the text below.
+
+Output only line-delimited records in either of these formats:
+name | kind | confidence
+subject | predicate | object | confidence
+
+Use entity kinds from: project, person, voice, tool, brand, concept, workspace, place.
+Use confidence values from 0.0 to 1.0. Skip unsupported or uncertain claims.
+
+Text:
+{body}
+"""
+
 _DISTILL_GOALS = {
     0: "Summarize this captured text into key decisions and facts.",
     1: "Synthesize these summaries into recurring patterns and key insights.",
@@ -30,6 +44,10 @@ def _bound_prompt(prompt: str, max_chars: int = MAX_PROMPT_CHARS) -> str:
     if len(prompt) <= max_chars:
         return prompt
     return prompt[:max_chars]
+
+
+def _split_lines(raw: str) -> list[str]:
+    return [line.strip() for line in raw.splitlines() if line.strip()]
 
 
 class OllamaLLM(BrainLLM):
@@ -70,3 +88,7 @@ class OllamaLLM(BrainLLM):
     def distill(self, text: str, tier: int) -> str:
         goal = _DISTILL_GOALS.get(tier, "Distill this text to its essence.")
         return self._generate(f"{goal}\n\n{text}")
+
+    def extract_entities(self, text: str) -> list[str]:
+        raw = self._generate(_EXTRACT_ENTITIES_PROMPT.format(body=text))
+        return _split_lines(raw)

@@ -23,6 +23,14 @@ ROUTES: dict[str, ModelRoute] = {
         heavy=True,
         gate="consolidation smoke plus summary sanity check",
     ),
+    "kg_extraction": ModelRoute(
+        stage="kg_extraction",
+        primary="ollama:gemma3:4b",
+        fallbacks=("api:moonshot:default", "off"),
+        env_var="ARI_OS_KG_LLM",
+        heavy=True,
+        gate="KG extraction smoke plus parser sanity check",
+    ),
 }
 
 

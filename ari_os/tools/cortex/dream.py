@@ -14,6 +14,7 @@ import time
 
 from ari_os.tools.cortex import config, distill
 from ari_os.tools.cortex.db import connect
+from ari_os.tools.cortex.kg.extractor import confidence_label
 from ari_os.tools.cortex.llm.base import BrainLLM
 
 COLD_THRESHOLD_SECS: int = 7 * 24 * 3600
@@ -28,6 +29,7 @@ class DreamResult:
     session_digests: int
     daily_syntheses: int
     weekly_arcs: int
+    surprising_connections: int
     dream_queue_items: int
     mode: str
 
@@ -128,6 +130,101 @@ def suggest_mode(
     return mode
 
 
+def write_surprising_connections(
+    db_path: Path,
+    output_dir: Path | None = None,
+    *,
+    top_n: int = 15,
+) -> int:
+    """Write a cross-region KG report into ``<state_home>/kg_reports``.
+
+    The report is LLM-independent: it reads existing KG rows, finds relations
+    whose entities primarily live in different chunk regions, and ranks them by
+    ``confidence * evidence_count``. It is idempotent per UTC day.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    report_dir = _state_root(output_dir) / "kg_reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    target = report_dir / f"{today}-surprising-connections.md"
+    if target.exists():
+        return 0
+
+    con = connect(db_path)
+    try:
+        region_rows = con.execute(
+            """SELECT ec.entity_id, c.region, COUNT(*) AS n
+                 FROM kg_entity_chunk ec
+                 JOIN chunk c ON c.id = ec.chunk_id
+             GROUP BY ec.entity_id, c.region"""
+        ).fetchall()
+        relation_rows = con.execute(
+            """SELECT se.name, r.predicate, oe.name,
+                      r.confidence, r.evidence_count, r.subject_id, r.object_id
+                 FROM kg_relation r
+                 JOIN kg_entity se ON se.id = r.subject_id
+                 JOIN kg_entity oe ON oe.id = r.object_id"""
+        ).fetchall()
+    finally:
+        con.close()
+
+    primary_region: dict[int, str] = {}
+    best_count: dict[int, int] = {}
+    for entity_id, region, count in region_rows:
+        if count > best_count.get(entity_id, 0):
+            best_count[entity_id] = count
+            primary_region[entity_id] = str(region)
+
+    scored: list[tuple[float, str, str, str, float, str, str]] = []
+    for (
+        subject_name,
+        predicate,
+        object_name,
+        confidence,
+        evidence_count,
+        subject_id,
+        object_id,
+    ) in relation_rows:
+        subject_region = primary_region.get(subject_id)
+        object_region = primary_region.get(object_id)
+        if not subject_region or not object_region or subject_region == object_region:
+            continue
+        score = float(confidence) * int(evidence_count)
+        scored.append(
+            (
+                score,
+                str(subject_name),
+                str(predicate),
+                str(object_name),
+                float(confidence),
+                subject_region,
+                object_region,
+            )
+        )
+    scored.sort(key=lambda item: item[0], reverse=True)
+
+    selected = scored[:top_n]
+    if not selected:
+        return 0
+
+    lines = [f"# Surprising Connections - {today}", ""]
+    for (
+        score,
+        subject_name,
+        predicate,
+        object_name,
+        confidence,
+        subject_region,
+        object_region,
+    ) in selected:
+        lines.append(
+            f"- **{subject_name}** -{predicate}-> **{object_name}** "
+            f"({confidence_label(confidence)}; why: bridges {subject_region} to {object_region}; "
+            f"score {score:.2f})"
+        )
+    target.write_text("\n".join(lines) + "\n")
+    return len(selected)
+
+
 def run_dream(
     db_path: Path,
     *,
@@ -149,6 +246,7 @@ def run_dream(
     )
     weekly_arcs = distill.distill_weekly_arc(db_path, output_dir=output_dir, llm=llm)
 
+    surprising_connections = write_surprising_connections(db_path, output_dir=output_dir)
     dream_queue_items = promote_tier3_to_dream_queue(db_path, output_dir=output_dir)
     decay_pass(db_path)
     resolved_mode_dir = Path(mode_dir) if mode_dir is not None else _dream_root(output_dir) / "modes"
@@ -158,14 +256,18 @@ def run_dream(
         session_digests=session_digests,
         daily_syntheses=daily_syntheses,
         weekly_arcs=weekly_arcs,
+        surprising_connections=surprising_connections,
         dream_queue_items=dream_queue_items,
         mode=mode,
     )
 
 
+def _state_root(output_dir: Path | None) -> Path:
+    return Path(output_dir) if output_dir is not None else config.state_home()
+
+
 def _dream_root(output_dir: Path | None) -> Path:
-    base = Path(output_dir) if output_dir is not None else config.state_home()
-    return base / "dream"
+    return _state_root(output_dir) / "dream"
 
 
 # P5: surprising-connections (KG)
@@ -180,4 +282,5 @@ __all__ = [
     "promote_tier3_to_dream_queue",
     "run_dream",
     "suggest_mode",
+    "write_surprising_connections",
 ]
