@@ -46,9 +46,69 @@ def backup(path) -> Path | None:
 
 
 def merge_settings(existing: dict, statusline_cmd: str) -> dict:
+    """Merge ARI-OS's statusline into an existing settings.json (legacy).
+
+    Statusline-only — does NOT register the SessionStart hook. The hook
+    lives in :func:`merge_settings_with_hooks` and is applied by
+    :func:`apply` when the installer writes settings.json. Tests that
+    assert hook-free behaviour keep the same contract.
+    """
     out = dict(existing)
     out["statusLine"] = {"type": "command", "command": statusline_cmd}
     return out
+
+
+def merge_settings_with_hooks(existing: dict, statusline_cmd: str) -> dict:
+    """Settings merge that ALSO registers the managed SessionStart hook.
+
+    Used by :func:`apply` when writing ``settings.json`` to ``$CLAUDE_DIR``.
+    Idempotent: a prior ARI-OS SessionStart entry is replaced in place;
+    non-ARI-OS hooks (e.g. PostToolUse entries) are preserved verbatim.
+    """
+    out = merge_settings(existing, statusline_cmd)
+    hooks = dict(out.get("hooks") or {})
+    ss = _strip_ari_os_session_start(hooks.get("SessionStart", []))
+    ss.append(_session_start_hook_entry())
+    hooks["SessionStart"] = ss
+    out["hooks"] = hooks
+    return out
+
+
+# --- SessionStart hook registration (reversible, managed) ------------------
+# We register exactly one SessionStart command hook in settings.json. The
+# command is a stable Python invocation that prints the regioned brain
+# context block. Re-running install/update is idempotent: any prior
+# ARI-OS SessionStart entry (matched by a stable marker line) is replaced
+# in place; non-ARI-OS hooks (e.g. PostToolUse entries) are preserved.
+SESSION_START_HOOK_MARKER = "# ari-os-session-start"
+
+
+def _session_start_hook_entry() -> dict:
+    """The single ARI-OS SessionStart command hook entry we own."""
+    cmd = f"{SESSION_START_HOOK_MARKER} python3 -m ari_os.hooks.session_start_cortex"
+    return {
+        "type": "command",
+        "command": cmd,
+        "timeout": 15,
+    }
+
+
+def _strip_ari_os_session_start(hooks_list: list) -> list:
+    """Remove any prior ARI-OS SessionStart entries (marked + bare) from a list.
+
+    Idempotent. We match on the marker comment + the module invocation, so a
+    legacy install (no marker) is still recognised and replaced.
+    """
+    kept = []
+    for entry in hooks_list or []:
+        if not isinstance(entry, dict):
+            kept.append(entry)
+            continue
+        cmd = entry.get("command", "")
+        if "ari_os.hooks.session_start_cortex" in cmd:
+            continue
+        kept.append(entry)
+    return kept
 
 
 def _repo_root() -> Path:
@@ -85,7 +145,7 @@ def apply(actions, dry_run: bool):
         elif kind == "settings":
             existing = json.loads(dst.read_text()) if dst.exists() else {}
             dst.write_text(json.dumps(
-                merge_settings(existing, "python3 -m ari_os.tools.statusline"),
+                merge_settings_with_hooks(existing, "python3 -m ari_os.tools.statusline"),
                 indent=2))
         elif kind == "claude_md":
             text = dst.read_text() if dst.exists() else ""
