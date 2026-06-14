@@ -282,6 +282,66 @@ def distill(tier: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# media
+# ---------------------------------------------------------------------------
+
+
+@main.command("see")
+@click.argument("image", type=click.Path(dir_okay=False, path_type=Path))
+def see_command(image: Path) -> None:
+    """Describe an image with the local vision bridge when enabled."""
+    from . import mcp_tools
+
+    result = mcp_tools.see_image(brain_db_path(), str(image))
+    click.echo(json.dumps(result, indent=2))
+
+
+@main.command("lens")
+@click.argument("slug")
+def lens_command(slug: str) -> None:
+    """Retrieve a local LENS card by slug when enabled."""
+    from . import mcp_tools
+
+    click.echo(mcp_tools.lens(brain_db_path(), slug).rstrip())
+
+
+@main.command("ears")
+@click.argument("audio_or_url")
+def ears_command(audio_or_url: str) -> None:
+    """Transcribe local audio or fetch a YouTube transcript when enabled."""
+    from . import config
+    from .media.media_engines import MediaUnavailable, transcribe_audio, youtube_text
+    from .mcp_tools import _cortex_llm_enabled
+
+    if not config.ears_enabled():
+        click.echo(
+            "cortex.ears is off. Enable it with `ari-os cortex ears on` "
+            "after installing local media backends."
+        )
+        return
+    if not _cortex_llm_enabled():
+        click.echo(
+            "cortex.ears is off because cortex.llm is off. Enable a local "
+            "LLM backend before using EARS media ingest."
+        )
+        return
+
+    try:
+        if audio_or_url.startswith(("http://", "https://")):
+            text = youtube_text(audio_or_url)
+        else:
+            text = transcribe_audio(Path(audio_or_url))
+    except (MediaUnavailable, ValueError) as exc:
+        click.echo(f"cortex.ears unavailable: {exc}")
+        return
+
+    if text:
+        click.echo(text)
+    else:
+        click.echo("cortex.ears returned no transcript.")
+
+
+# ---------------------------------------------------------------------------
 # mode
 # ---------------------------------------------------------------------------
 
