@@ -12,5 +12,11 @@ dependencies = [
     "requests>=2.31",
 ]
 
+[project.optional-dependencies]
+media = [
+    "youtube-transcript-api>=0.6",
+    "pillow>=9.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
