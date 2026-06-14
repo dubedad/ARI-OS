@@ -49,16 +49,16 @@ AUDITABLE_SUFFIXES = {
     ".sh",
 }
 _BANNED_B64 = (
-    "U0hBRE9X",  # internal
-    "L1ZvbHVtZXM=",  # /tmp
-    "Y3JlYXRpb2V4bmloaWxv",  # example
-    "c2hhZG93X2Rpc3BhdGNo",  # dispatch
-    "c2hhZG93X2JyYWlu",  # localbrain
-    "TUVNT1JZX0JBTks=",  # MEMORY_STORE
-    "TmVvbg==",  # postgres
-    "U0hBRE9XX0NPVU5DSUw=",  # COUNCIL
-    "TklNXw==",  # NX_
-    "QlJBSU5fTExN",  # LLM_BACKEND
+    "U0hBRE9X",
+    "L1ZvbHVtZXM=",
+    "Y3JlYXRpb2V4bmloaWxv",
+    "c2hhZG93X2Rpc3BhdGNo",
+    "c2hhZG93X2JyYWlu",
+    "TUVNT1JZX0JBTks=",
+    "TmVvbg==",
+    "U0hBRE9XX0NPVU5DSUw=",
+    "TklNXw==",
+    "QlJBSU5fTExN",
 )
 BANNED_TOKENS = tuple(base64.b64decode(raw).decode("ascii") for raw in _BANNED_B64)
 

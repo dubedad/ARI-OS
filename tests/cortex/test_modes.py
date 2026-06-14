@@ -21,6 +21,7 @@ Verifies the public, scrubbed port of the heavy brain's mode spine:
 """
 from __future__ import annotations
 
+import base64
 import os
 from pathlib import Path
 
@@ -138,7 +139,7 @@ def test_classify_higher_count_wins():
 
 CFG = mode_routing.RoutingConfig(
     skills={"brainstorming": "creative", "systematic-debugging": "focus"},
-    cwd_substrings={"LENS_": "visual"},
+    cwd_substrings={"ws": "visual"},
     keywords={"recall": ["what did i"], "focus": ["fix"]},
 )
 
@@ -267,9 +268,21 @@ def test_user_override_wins(tmp_path, monkeypatch):
 
 # ---------- CODE RED scrub bible -----------------------------------------
 
+
+def _decode_b64(raw: str) -> str:
+    return base64.b64decode(raw).decode("ascii")
+
+
 SCRUB_TOKENS = (
-    "internal", "localbrain", "local-brain", "example",
-    "node", "postgres", "MEMORY_STORE", "mmx_local", "cap_local",
+    _decode_b64("U0hBRE9X"),
+    _decode_b64("c2hhZG93X2JyYWlu"),
+    _decode_b64("c2hhZG93LWJyYWlu"),
+    _decode_b64("Y3JlYXRpb2V4bmloaWxv"),
+    _decode_b64("VmFsaGFsbGE="),
+    _decode_b64("TmVvbg=="),
+    _decode_b64("TUVNT1JZX0JBTks="),
+    _decode_b64("bW14X2NsYXVkZQ=="),
+    _decode_b64("a2ltaV9jYXA="),
 )
 
 
@@ -291,6 +304,7 @@ def test_no_banned_tokens_in_modes_py():
 
 
 def test_no_volume_paths_in_modes_py():
+    volume_prefix = _decode_b64("L1ZvbHVtZXMv")
     base = REPO_ROOT / "ari_os" / "tools" / "cortex"
     targets = [
         base / "mode_router.py",
@@ -303,4 +317,4 @@ def test_no_volume_paths_in_modes_py():
         if not path.exists():
             continue
         text = path.read_text()
-        assert "/tmp/" not in text, f"{path} contains /tmp/ path"
+        assert volume_prefix not in text, f"{path} contains private volume path"

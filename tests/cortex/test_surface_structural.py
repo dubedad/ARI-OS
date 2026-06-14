@@ -69,16 +69,16 @@ def _split_frontmatter(text: str) -> tuple[dict[str, str], str]:
 # grep (which matches plain substrings) does not flag this test file's own
 # token list as a violation. Same pattern as test_seeds_neutral.py.
 _BANNED_B64: tuple[str, ...] = (
-    "U0hBRE9X",              # internal
-    "L1ZvbHVtZXM=",          # /tmp
-    "Y3JlYXRpb2V4bmloaWxv",  # example
-    "c2hhZG93X2Rpc3BhdGNo",  # dispatch
-    "c2hhZG93X2JyYWlu",      # localbrain
-    "VmFsaGFsbGE=",          # node
-    "TmVvbg==",              # postgres
-    "TUVNT1JZX0JBTks=",      # MEMORY_STORE
-    "bW14X2NsYXVkZQ==",      # mmx_local
-    "a2ltaV9jYXA=",          # cap_local
+    "U0hBRE9X",
+    "L1ZvbHVtZXM=",
+    "Y3JlYXRpb2V4bmloaWxv",
+    "c2hhZG93X2Rpc3BhdGNo",
+    "c2hhZG93X2JyYWlu",
+    "VmFsaGFsbGE=",
+    "TmVvbg==",
+    "TUVNT1JZX0JBTks=",
+    "bW14X2NsYXVkZQ==",
+    "a2ltaV9jYXA=",
 )
 
 
