@@ -789,6 +789,16 @@ def retrieve(
         assembler_on=ASSEMBLER_ENABLED,
         latency_ms=(time.monotonic() - _t_start) * 1000.0,
     )
+    if session_id:
+        try:
+            from . import council, council_marker
+
+            council_marker.record_tier(
+                session_id,
+                "normal" if council.enabled() else "static",
+            )
+        except Exception:
+            pass
     update_hebbian_edges(db_path, returned_ids)
     return RetrievalResult(
         chunks=packed, query=query, mode=mode, cwd=cwd, branch=branch,
