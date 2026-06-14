@@ -74,6 +74,106 @@ def merge_settings_with_hooks(existing: dict, statusline_cmd: str) -> dict:
     return out
 
 
+# --- MCP server registration (added for ar.t12) -----------------------------
+# The ARI-OS Cortex MCP server (brain.recall / lineage / regions / tracts /
+# modes) is registered into the user's ``$CLAUDE_DIR/.mcp.json`` so LLM
+# sessions can query the brain mid-session. Registered by default during
+# ``install``/``update``; ``--no-mcp`` opts out.
+MCP_SERVER_NAME = "ari-os-cortex"
+MCP_SERVER_COMMAND = "python3"
+MCP_SERVER_MODULE = "ari_os.tools.cortex.mcp_server"
+MCP_SERVER_ARGS = ["-m", MCP_SERVER_MODULE, "stdio"]
+
+
+def _mcp_server_entry() -> dict:
+    """The single ARI-OS Cortex MCP server entry we own (stdio transport)."""
+    return {
+        "command": MCP_SERVER_COMMAND,
+        "args": MCP_SERVER_ARGS,
+    }
+
+
+def _strip_ari_os_mcp_server(servers: dict) -> dict:
+    """Remove any prior ARI-OS Cortex MCP server entry by command marker.
+
+    Idempotent: a prior install is recognised by ``ari_os.tools.cortex.mcp_server``
+    in the args (the module is stable across versions) and replaced in place.
+    Other user-owned MCP servers (e.g. vercel, stripe) are preserved.
+    """
+    out = {}
+    for name, entry in (servers or {}).items():
+        if not isinstance(entry, dict):
+            out[name] = entry
+            continue
+        args = entry.get("args") or []
+        if MCP_SERVER_MODULE in args:
+            continue
+        out[name] = entry
+    return out
+
+
+def merge_mcp_servers(existing: dict) -> dict:
+    """Merge the ARI-OS Cortex MCP server entry into an existing mcpServers map.
+
+    Idempotent: a prior ARI-OS entry is replaced in place; non-ARI-OS
+    servers are preserved verbatim. Always returns a dict with a
+    ``mcpServers`` key.
+    """
+    base = dict(existing or {})
+    servers = _strip_ari_os_mcp_server(base.get("mcpServers") or {})
+    servers[MCP_SERVER_NAME] = _mcp_server_entry()
+    base["mcpServers"] = servers
+    return base
+
+
+def write_mcp_servers(register: bool = True) -> Path | None:
+    """Write ``$CLAUDE_DIR/.mcp.json`` registering the ARI-OS Cortex server.
+
+    Returns the path on success, or ``None`` if not registered (``register=False``).
+    Idempotent: a prior ARI-OS entry is replaced in place; non-ARI-OS
+    entries are preserved verbatim. Creates the file (with the ARI-OS
+    entry) if it does not exist.
+    """
+    if not register:
+        return None
+    cd = paths.claude_dir()
+    cd.mkdir(parents=True, exist_ok=True)
+    mcp_json = cd / ".mcp.json"
+    existing: dict = {}
+    if mcp_json.exists():
+        try:
+            existing = json.loads(mcp_json.read_text() or "{}")
+        except (json.JSONDecodeError, OSError):
+            existing = {}
+    backup(mcp_json)  # best-effort; no-op if file didn't exist
+    mcp_json.write_text(json.dumps(merge_mcp_servers(existing), indent=2))
+    return mcp_json
+
+
+def unregister_mcp_server() -> bool:
+    """Remove the ARI-OS Cortex MCP server entry from ``$CLAUDE_DIR/.mcp.json``.
+
+    Returns True if the entry was present and removed, False otherwise.
+    Non-ARI-OS entries are preserved.
+    """
+    cd = paths.claude_dir()
+    mcp_json = cd / ".mcp.json"
+    if not mcp_json.exists():
+        return False
+    try:
+        existing = json.loads(mcp_json.read_text() or "{}")
+    except (json.JSONDecodeError, OSError):
+        return False
+    servers = existing.get("mcpServers") or {}
+    if MCP_SERVER_NAME not in servers:
+        return False
+    backup(mcp_json)
+    del servers[MCP_SERVER_NAME]
+    existing["mcpServers"] = servers
+    mcp_json.write_text(json.dumps(existing, indent=2))
+    return True
+
+
 # --- SessionStart hook registration (reversible, managed) ------------------
 # We register exactly one SessionStart command hook in settings.json. The
 # command is a stable Python invocation that prints the regioned brain
@@ -133,8 +233,14 @@ def plan_actions(repo) -> list[tuple[str, Path, Path]]:
     return actions
 
 
-def apply(actions, dry_run: bool):
+def apply(actions, dry_run: bool, register_mcp: bool = True):
     if dry_run:
+        # MCP registration: even in dry-run we report intent.
+        mcp_path = paths.claude_dir() / ".mcp.json"
+        if register_mcp:
+            return [(k, str(dst)) for (k, _src, dst) in actions] + [
+                ("mcp", MCP_SERVER_MODULE, str(mcp_path))
+            ]
         return [(k, str(dst)) for (k, _src, dst) in actions]
     changes = []
     for kind, src, dst in actions:
@@ -151,6 +257,11 @@ def apply(actions, dry_run: bool):
             text = dst.read_text() if dst.exists() else ""
             dst.write_text(inject_block(text, CLAUDE_BODY))
         changes.append({"path": str(dst), "backup": str(b) if b else None})
+    # MCP server registration (default on; opt out with --no-mcp).
+    if register_mcp:
+        mcp_path = write_mcp_servers(register=True)
+        if mcp_path is not None:
+            changes.append({"path": str(mcp_path), "backup": None, "kind": "mcp"})
     manifest = {"version": _version(_repo_root()), "ts": _ts(), "changes": changes}
     paths.installed_manifest().parent.mkdir(parents=True, exist_ok=True)
     paths.installed_manifest().write_text(json.dumps(manifest, indent=2))
@@ -165,7 +276,11 @@ def revert() -> None:
     manifest = json.loads(mf.read_text())
     for ch in reversed(manifest["changes"]):
         dst = Path(ch["path"])
-        bk = ch["backup"]
+        bk = ch.get("backup")
+        kind = ch.get("kind")
+        if kind == "mcp":
+            unregister_mcp_server()
+            continue
         if bk:
             shutil.copy2(bk, dst)
         elif dst.exists():
@@ -174,6 +289,7 @@ def revert() -> None:
 
 
 def uninstall(purge_keys: bool = False) -> None:
+    unregister_mcp_server()
     revert()
     if purge_keys:
         cfg = paths.state_home() / "config.json"
@@ -181,9 +297,9 @@ def uninstall(purge_keys: bool = False) -> None:
             cfg.unlink()
 
 
-def update() -> None:
+def update(register_mcp: bool = True) -> None:
     # Re-apply from the repo; config.json + keychain keys are never touched.
-    apply(plan_actions(_repo_root()), dry_run=False)
+    apply(plan_actions(_repo_root()), dry_run=False, register_mcp=register_mcp)
 
 
 def main() -> None:
@@ -193,7 +309,10 @@ def main() -> None:
     ap.add_argument("--uninstall", action="store_true")
     ap.add_argument("--update", action="store_true")
     ap.add_argument("--purge-keys", action="store_true")
+    ap.add_argument("--no-mcp", action="store_true",
+                    help="Skip registering the ARI-OS Cortex MCP server.")
     a = ap.parse_args()
+    register_mcp = not a.no_mcp
     if a.revert:
         revert()
         print("Reverted last ARI-OS change.")
@@ -203,10 +322,11 @@ def main() -> None:
         print("ARI-OS uninstalled.")
         return
     if a.update:
-        update()
+        update(register_mcp=register_mcp)
         print("ARI-OS updated.")
         return
-    actions = apply(plan_actions(_repo_root()), dry_run=a.dry_run)
+    actions = apply(plan_actions(_repo_root()), dry_run=a.dry_run,
+                    register_mcp=register_mcp)
     verb = "Would apply" if a.dry_run else "Applied"
     for kind, dst in actions:
         print(f"{verb}: {kind} -> {dst}")

@@ -6,7 +6,13 @@ seeds + task classifier (ar.t5): region_anchors, task_classifier,
 task_region_weights. Modes (ar.t6): mode_router, mode_routing, mode_state,
 modes. Retrieval (ar.t7): retrieve (hybrid FTS+vec, region rerank,
 divisive-norm, kg_expand). Context assembly (ar.t8): context_assembler,
-context_block. The rest (MCP, CLI) lands in later tasks.
+context_block. CLI (ar.t9): cortex. MCP (ar.t12): mcp_server, mcp_tools.
+
+The MCP server module is intentionally NOT eagerly imported here — it is
+its own runnable (``python -m ari_os.tools.cortex.mcp_server stdio``)
+and importing it eagerly would trip runpy's "found in sys.modules" warning
+when launched as a subprocess. Import :mod:`ari_os.tools.cortex.mcp_server`
+on demand.
 """
 from . import (  # noqa: F401
     chunker,
