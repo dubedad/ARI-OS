@@ -27,9 +27,9 @@ What it covers (mapped to the P6 plan DoD table):
   the full suite is green with FSRS active; ``retrieve()``'s body is
   unchanged in the diff (this gate asserts the commit diff is empty).
 - **DoD-P6-e** - suite green + scrub clean: new P6 tests pass, the
-  scrub-bible grep over the production tree returns zero, no
-  ``MEMORY_STORE`` / ``BRAIN_HOME`` strings are present, and
-  artifacts resolve under the ARI-OS state home.
+  scrub-bible grep over the production tree returns zero, no private
+  state-home or memory-bank strings are present, and artifacts resolve
+  under the ARI-OS state home.
 
 The audit grep is mirrored from the spec bash so the in-process Python
 scan is testable without a shell and matches the operational intent of
@@ -77,16 +77,16 @@ _AUDITABLE_SUFFIXES = (
 # ---------------------------------------------------------------------------
 
 _BANNED_B64: tuple[str, ...] = (
-    "U0hBRE9X",            # internal
-    "L1ZvbHVtZXM=",        # /tmp
-    "Y3JlYXRpb2V4bmloaWxv",  # example
-    "c2hhZG93X2Rpc3BhdGNo",  # dispatch
-    "c2hhZG93X2JyYWlu",   # localbrain
-    "VmFsaGFsbGE=",        # node
-    "TmVvbg==",            # postgres
-    "TUVNT1JZX0JBTks=",    # MEMORY_STORE
-    "bW14X2NsYXVkZQ==",   # mmx_local
-    "a2ltaV9jYXA=",       # cap_local
+    "U0hBRE9X",
+    "L1ZvbHVtZXM=",
+    "Y3JlYXRpb2V4bmloaWxv",
+    "c2hhZG93X2Rpc3BhdGNo",
+    "c2hhZG93X2JyYWlu",
+    "VmFsaGFsbGE=",
+    "TmVvbg==",
+    "TUVNT1JZX0JBTks=",
+    "bW14X2NsYXVkZQ==",
+    "a2ltaV9jYXA=",
 )
 
 
@@ -95,6 +95,10 @@ def _banned_tokens() -> list[str]:
 
 
 BANNED_TOKENS: tuple[str, ...] = tuple(_banned_tokens())
+_PRIVATE_STATE_NEEDLES: tuple[str, ...] = (
+    base64.b64decode("U0hBRE9XX0JSQUlOX0hPTUU=").decode("ascii"),
+    base64.b64decode("TUVNT1JZX0JBTks=").decode("ascii"),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -686,10 +690,10 @@ def test_dod_p6_e_scrub_bible_returns_zero_in_production_tree():
         )
 
 
-def test_dod_p6_e_no_localbrain_home_or_memory_bank_strings():
-    """DoD-P6-e: the P6 surface carries no ``$BRAIN_HOME`` /
-    ``MEMORY_STORE`` strings - all artifact writes resolve to the ARI-OS
-    state home (``$ARI_OS_HOME``)."""
+def test_dod_p6_e_no_private_home_or_memory_strings():
+    """DoD-P6-e: the P6 surface carries no private state-home or
+    memory-bank strings - all artifact writes resolve to the ARI-OS state
+    home (``$ARI_OS_HOME``)."""
     roots = [FSRS_DIR, PREDICTIVE_DIR, WORKSPACE_DIR, CORTEX_ROOT / "config.py"]
     for root in roots:
         if root.is_dir():
@@ -711,7 +715,7 @@ def _assert_no_lore_strings(path: Path) -> None:
         text = path.read_text()
     except (OSError, UnicodeDecodeError):
         return
-    for needle in ("BRAIN_HOME", "MEMORY_STORE"):
+    for needle in _PRIVATE_STATE_NEEDLES:
         assert needle not in text, (
             f"{path.relative_to(REPO_ROOT)} contains lore-only {needle!r} string"
         )

@@ -27,7 +27,7 @@ What it covers (mapped to the heavy-core plan DoD table):
 - **DoD-P4-f** - the heavy ``/morning`` routine skill/command surface
   emits a maintenance + dashboard block (verified structurally by the
   ``test_routines_structural`` test). The DoD-P4-f assertion here is
-  "zero internal-specific surfaces in the skill/command tree".
+  "zero private-specific surfaces in the skill/command tree".
 - **DoD-P4-g** - the heavy ``/night`` routine runs the dream pass first
   and then layers a generic end-of-day review (verified structurally
   by ``test_routines_structural``). The DoD-P4-g assertion here is
@@ -77,16 +77,16 @@ _AUDITABLE_SUFFIXES = (
 # ---------------------------------------------------------------------------
 
 _BANNED_B64: tuple[str, ...] = (
-    "U0hBRE9X",            # internal
-    "L1ZvbHVtZXM=",        # /tmp
-    "Y3JlYXRpb2V4bmloaWxv",  # example
-    "c2hhZG93X2Rpc3BhdGNo",  # dispatch
-    "c2hhZG93X2JyYWlu",   # localbrain
-    "VmFsaGFsbGE=",        # node
-    "TmVvbg==",            # postgres
-    "TUVNT1JZX0JBTks=",    # MEMORY_STORE
-    "bW14X2NsYXVkZQ==",   # mmx_local
-    "a2ltaV9jYXA=",       # cap_local
+    "U0hBRE9X",
+    "L1ZvbHVtZXM=",
+    "Y3JlYXRpb2V4bmloaWxv",
+    "c2hhZG93X2Rpc3BhdGNo",
+    "c2hhZG93X2JyYWlu",
+    "VmFsaGFsbGE=",
+    "TmVvbg==",
+    "TUVNT1JZX0JBTks=",
+    "bW14X2NsYXVkZQ==",
+    "a2ltaV9jYXA=",
 )
 
 
@@ -532,7 +532,7 @@ def test_dod_p4_e_wander_off_blocks_surface_and_embed(
 
 
 # ======================================================================
-# DoD-P4-f + DoD-P4-g - /morning + /night surface has no internal / mesh.
+# DoD-P4-f + DoD-P4-g - /morning + /night surface has no private lore / mesh.
 # ======================================================================
 
 
@@ -541,7 +541,7 @@ def test_dod_p4_f_morning_surface_has_no_banned_tokens():
 
     Maintenance + dashboard block emission is structurally verified in
     ``test_routines_structural.test_morning_emits_maintenance_dashboard``.
-    Here we ensure the surface carries no banned internal-specific tokens.
+    Here we ensure the surface carries no banned private-surface tokens.
     """
     roots = [SKILLS_DIR / "morning" / "SKILL.md", COMMANDS_DIR / "morning.md"]
     for path in roots:
@@ -560,7 +560,7 @@ def test_dod_p4_g_night_surface_has_no_banned_tokens():
     /night runs dream/consolidation first and then layers a generic
     end-of-day review - structurally verified in
     ``test_routines_structural.test_night_runs_dream_before_review``.
-    Here we ensure the surface carries no banned internal-specific tokens.
+    Here we ensure the surface carries no banned private-surface tokens.
     """
     roots = [SKILLS_DIR / "night" / "SKILL.md", COMMANDS_DIR / "night.md"]
     for path in roots:

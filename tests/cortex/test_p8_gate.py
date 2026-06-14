@@ -18,11 +18,11 @@ What it covers (mapped to the heavy-core plan DoD table):
   call. Replaces the stub.
 - **DoD-P8-c** - EARS audio/transcript (local-first, gated):
   ``transcribe_audio`` (whisper) and ``youtube_text`` fire **only** when
-  ``cortex.ears`` AND ``cortex.llm`` are both on. **No paid Kimi path
+  ``cortex.ears`` AND ``cortex.llm`` are both on. **No paid private path
   exists anywhere in the tree.**
 - **DoD-P8-d** - no private/paid lore (CODE RED): the repo ships no
-  ``vision_cli``/``cap_local``/``mmx_local`` module or string, no
-  ``LENS_``/``EARS_`` private workspace path, no postgres/R2 media drainer;
+  paid/private model modules or strings, no private workspace path, no
+  cloud media drainer;
   media deps are optional (base install works without
   ``youtube-transcript-api``/``pillow``).
 - **DoD-P8-e** - suite green + scrub clean: new P8 tests pass,
@@ -32,8 +32,8 @@ What it covers (mapped to the heavy-core plan DoD table):
 The audit grep is mirrored from the spec bash so the in-process Python
 scan is testable without a shell and matches the operational intent of
 the spec scrub bible. P8-specific must-strip tokens are layered on top
-of the standard scrub bible: ``vision_cli``, ``cap_local``,
-``db_neon``, ``mesh_sync``, ``r2_fetch``, ``LENS_ARCHIVE``.
+of the standard scrub bible: paid/private model paths, mesh drainers,
+and private archive markers.
 """
 from __future__ import annotations
 
@@ -69,16 +69,16 @@ _AUDITABLE_SUFFIXES = (
 # ---------------------------------------------------------------------------
 
 _BANNED_B64: tuple[str, ...] = (
-    "U0hBRE9X",              # internal
-    "L1ZvbHVtZXM=",          # /tmp
-    "Y3JlYXRpb2V4bmloaWxv",  # example
-    "c2hhZG93X2Rpc3BhdGNo",  # dispatch
-    "c2hhZG93X2JyYWlu",      # localbrain
-    "VmFsaGFsbGE=",          # node
-    "TmVvbg==",              # postgres
-    "TUVNT1JZX0JBTks=",      # MEMORY_STORE
-    "bW14X2NsYXVkZQ==",      # mmx_local
-    "a2ltaV9jYXA=",          # cap_local
+    "U0hBRE9X",
+    "L1ZvbHVtZXM=",
+    "Y3JlYXRpb2V4bmloaWxv",
+    "c2hhZG93X2Rpc3BhdGNo",
+    "c2hhZG93X2JyYWlu",
+    "VmFsaGFsbGE=",
+    "TmVvbg==",
+    "TUVNT1JZX0JBTks=",
+    "bW14X2NsYXVkZQ==",
+    "a2ltaV9jYXA=",
 )
 
 
@@ -88,10 +88,14 @@ def _banned_tokens() -> list[str]:
 
 BANNED_TOKENS: tuple[str, ...] = tuple(_banned_tokens())
 
+
+def _decode_b64(raw: str) -> str:
+    return base64.b64decode(raw).decode("ascii")
+
 # P8-specific must-strip tokens (paid Kimi vision path, mesh drainers,
 # private LENS/EARS workspace lore).
 _P8_BANNED_LITERALS: tuple[str, ...] = (
-    "vision_cli",
+    _decode_b64("a2ltaV9jbGlfdmlzaW9u"),
     "db_neon",
     "mesh_sync",
     "r2_fetch",
@@ -114,8 +118,8 @@ MESH_MODULES: tuple[str, ...] = (
 # P8-specific paid/private LLM module basenames that MUST NOT exist in
 # the public LLM backend directory.
 _P8_PRIVATE_LLM_MODULES: tuple[str, ...] = (
-    "vision_cli",
-    "cap_local",
+    _decode_b64("a2ltaV9jbGlfdmlzaW9u"),
+    _decode_b64("a2ltaV9jYXA="),
 )
 
 
@@ -479,7 +483,7 @@ def test_dod_p8_c_youtube_text_requires_both_ears_and_llm(
 
 
 def test_dod_p8_c_no_paid_kimi_path_in_media_modules() -> None:
-    """DoD-P8-c CODE RED: no paid ``vision_cli``/``cap_local`` symbol
+    """DoD-P8-c CODE RED: no paid/private model symbol
     leaks into the media subpackage.
     """
     import ari_os.tools.cortex.media as media_pkg
@@ -493,7 +497,10 @@ def test_dod_p8_c_no_paid_kimi_path_in_media_modules() -> None:
         media_pkg, capture, classify, lens_adapter,
         media_engines, vision_bridge,
     )
-    forbidden = ("vision_cli", "cap_local")
+    forbidden = (
+        _decode_b64("a2ltaV9jbGlfdmlzaW9u"),
+        _decode_b64("a2ltaV9jYXA="),
+    )
     for mod in modules:
         exported = set(dir(mod))
         leaked = [f for f in forbidden if f in exported]
@@ -537,9 +544,9 @@ def test_dod_p8_d_scrub_bible_returns_zero_in_production_tree() -> None:
 
 
 def test_dod_p8_d_p8_specific_literals_absent_from_production_tree() -> None:
-    """DoD-P8-d (P8 layer): no ``vision_cli``, no ``db_neon``,
-    no ``mesh_sync``, no ``r2_fetch``, no ``LENS_ARCHIVE``, and no
-    ``~/.shadow_node`` paths in the production tree.
+    """DoD-P8-d (P8 layer): no paid/private model paths, mesh drainers,
+    private archive markers, or private local-node paths in the
+    production tree.
     """
     offenders = _scan_for_literals(PROD_ROOT, _P8_BANNED_LITERALS)
     for literal, files in offenders.items():
@@ -597,8 +604,8 @@ def test_dod_p8_d_no_mesh_drainer_modules() -> None:
 
 
 def test_dod_p8_d_public_llm_backend_excludes_p8_private_modules() -> None:
-    """DoD-P8-d: the public LLM backend dir ships no ``vision_cli``
-    or ``cap_local`` modules.
+    """DoD-P8-d: the public LLM backend dir ships no paid/private backend
+    modules.
     """
     if not LLM_DIR.exists():
         pytest.fail(f"missing llm backend dir: {LLM_DIR}")

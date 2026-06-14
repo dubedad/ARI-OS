@@ -16,7 +16,7 @@
 └──────────────────────────────────────────────────────────┘
 ```
 
-Pure Python standard library. No third-party dependencies. One install.
+Batteries-included: a few declared dependencies, one `install.py`, an optional local model — and Claude Code gains a background crew and a live brain.
 
 ## What is this, in plain English?
 
@@ -39,8 +39,9 @@ Four ideas make that work, and ARI-OS ships all four as installable pieces:
    advising. The worker runs on its own; you review the result.
 3. **Continuity.** A handoff format lets a fresh session pick up cold with zero
    loss, so a long job survives across days.
-4. **A memory.** A local brain (Cortex) the workflow writes to and reads from, so
-   work builds on what past sessions decided instead of starting cold.
+4. **A live memory.** A local brain (Cortex) the workflow writes to and reads
+   from — semantically — so work builds on what past sessions decided instead of
+   starting cold.
 
 ## The shift
 
@@ -103,11 +104,11 @@ taste, and deciding what "done" means.
 - **Status line** puts context %, model, branch, worker count, and the clock in
   your footer.
 
-## Memory (the light brain)
+## Memory (Cortex, a live brain)
 
-ARI-OS ships a local brain called **Cortex**. It lives on your own machine
-(`~/.ari-os/cortex.db`), it is pure standard library, and it makes the workflow
-build on what you have already decided instead of starting every session cold.
+ARI-OS ships a local brain called **Cortex**. It lives on your own machine as a
+single SQLite file (`~/.ari-os/brain.db`), and it makes the workflow build on what
+you have already decided instead of starting every session cold.
 
 - **`/remember`** saves a decision, fact, or open thread.
 - **`/recall`** pulls the relevant past context before you answer. It **tunnels to
@@ -120,13 +121,18 @@ build on what you have already decided instead of starting every session cold.
 - **`/night`** consolidates, reviews what you captured, and writes a carry-forward
   so tomorrow resumes cleanly.
 
-Three modes (`focus`, `default`, `wide`) tune how broad recall is, and every so
-often the brain surfaces a tangential memory from outside your current focus, a
-deliberate re-orientation that is off in `focus`.
+Cognitive **modes** (`default`, `focus`, `wide`, `deep`, `creative`, `recall`,
+`synthesis`, and more) tune how recall reranks — region weights, breadth, token
+budget — and every so often the brain surfaces a tangential memory from outside
+your current focus, a deliberate re-orientation that is off in `focus`. See
+[Tuning your brain](#tuning-your-brain).
 
-**Recall works with zero setup** (ranked keyword search, standard library). If an
-embeddings key or a local model is available, it quietly upgrades to semantic
-recall too. No extra install either way.
+**Recall is semantic by default.** With a local [Ollama](https://ollama.com) (the
+recommended backend) the brain embeds your memories with `nomic-embed-text` and
+reranks them by meaning; a small local model (`gemma3:4b`) also consolidates them
+between sessions. No Ollama? Recall falls back to ranked keyword search — still
+useful, and the brain stays a single file you own. Pick the backend with
+`python3 -m ari_os.tools.cortex llm <ollama|api|off>`.
 
 ### Optional: audio and video (EARS / LENS)
 
@@ -136,9 +142,10 @@ turns a video into frame captions. Both use a tool or key you already have, and
 the core brain never depends on them.
 
 ```bash
-python3 -m ari_os.tools.arios cortex status     # current memory settings
-python3 -m ari_os.tools.arios cortex mode wide  # broaden recall
-python3 -m ari_os.tools.arios cortex ears on    # enable audio ingest
+python3 -m ari_os.tools.cortex tune             # inspect the active mode + weights
+python3 -m ari_os.tools.cortex llm ollama       # set the LLM backend (ollama|api|off)
+python3 -m ari_os.tools.arios cortex status     # quick memory settings
+python3 -m ari_os.tools.arios cortex ears on    # enable audio ingest (optional)
 ```
 
 ## A typical loop
@@ -189,14 +196,17 @@ running a crew, not waiting on a queue of one.
 ```
 
 ```bash
-python3 install.py          # or: "read SETUP.md and set this up"
+uv pip install -e .         # install dependencies (or: pip install -e .)
+python3 install.py          # wire into Claude Code + stand up the brain
 ```
 
 It copies the skills and commands into your Claude Code directory, registers a
-status line, and adds a short managed block to your `CLAUDE.md`. Every change is
-**backed up and recorded**, so it is fully reversible. Your existing settings and
-keys are parsed and merged, never overwritten. See **[SETUP.md](SETUP.md)** for
-the manual path.
+status line and a SessionStart hook, adds a short managed block to your
+`CLAUDE.md`, registers the Cortex MCP server, and **stands up an empty local
+brain** (pick the recall backend with `--llm ollama|api|off`, default `ollama`;
+opt into media with `--ears` / `--lens`). Every change is **backed up and
+recorded**, so it is fully reversible. Your existing settings and keys are parsed
+and merged, never overwritten. See **[SETUP.md](SETUP.md)** for the manual path.
 
 ## Control panel
 
@@ -221,14 +231,14 @@ region weights, tier weights, how many vector results to pull, graph expansion,
 and the token budget for the final context block.
 
 ```bash
-arios cortex tune
-arios cortex mode list
-arios cortex mode get
-arios cortex mode set wide
+python3 -m ari_os.tools.cortex tune
+python3 -m ari_os.tools.cortex mode list
+python3 -m ari_os.tools.cortex mode get
+python3 -m ari_os.tools.cortex mode set wide
 ```
 
-Use `arios cortex tune` to inspect the active mode. Switch modes with
-`arios cortex mode set <name>`, or customize the bundled YAML files in
+Use `python3 -m ari_os.tools.cortex tune` to inspect the active mode. Switch modes
+with `... cortex mode set <name>`, or customize the bundled YAML files in
 `ari_os/tools/cortex/modes/`.
 
 ## Lifecycle
