@@ -110,3 +110,19 @@ def wander_enabled(default: bool = True) -> bool:
     if env is not None:
         return env.strip().lower() in {"1", "true", "yes", "on"}
     return config_bool("cortex.wander", default)
+
+
+def ears_enabled(default: bool = False) -> bool:
+    """Return the global ``cortex.ears`` toggle."""
+    env = os.environ.get("ARI_OS_EARS")
+    if env is not None:
+        return env.strip().lower() in {"1", "true", "yes", "on"}
+    return config_bool("cortex.ears", default)
+
+
+def lens_enabled(default: bool = False) -> bool:
+    """Return the global ``cortex.lens`` toggle."""
+    env = os.environ.get("ARI_OS_LENS")
+    if env is not None:
+        return env.strip().lower() in {"1", "true", "yes", "on"}
+    return config_bool("cortex.lens", default)

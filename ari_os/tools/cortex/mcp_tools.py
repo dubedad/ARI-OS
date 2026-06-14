@@ -3,10 +3,9 @@
 Each function takes db_path as its first argument and returns plain Python
 types (str, dict, list) that FastMCP serialises for the client.
 
-Public port + scrub of the private engine's MCP handlers. Private
-implementations (vision_bridge / LENS cards) are replaced with friendly
-"not supported" responses — those surfaces are mesh/personal in the
-private engine and not part of the ARI-OS public package.
+Public port + scrub of the private engine's MCP handlers. Media surfaces
+are local-first and default-off so fresh installs stay inert until the
+user explicitly enables them.
 """
 from __future__ import annotations
 
@@ -164,11 +163,53 @@ def see_image(db_path: Path, image_path: str, *, mode: str = "visual") -> dict:
 
 
 def lens(db_path: Path, slug: str) -> str:
-    """Retrieve a LENS card by slug.
+    """Retrieve a LENS card by slug from the user's local state home."""
+    from . import config
+    from .media.lens_adapter import find_card
 
-    The ARI-OS public package ships without the LENS_ card layout used by
-    the private engine (LENS_ cards are personal/mesh-authored). The
-    surface is preserved for client compatibility; the response always
-    says the slug was not found.
-    """
+    if not config.lens_enabled():
+        return (
+            "## brain.lens is off\n\n"
+            "Enable it with `ari-os cortex lens on` after adding local "
+            "cards under your ARI-OS state home.\n"
+        )
+
+    card = find_card(config.state_home() / "lens", slug)
+    if card is not None:
+        return _format_lens_card(card)
+
+    indexed = _lens_from_indexed_chunks(db_path, slug)
+    if indexed is not None:
+        return indexed
+
     return f"## LENS card not found: {slug}\n"
+
+
+def _format_lens_card(card) -> str:
+    title = card.title or card.slug
+    body = card.body.strip()
+    return f"# {title}\n\n{body}\n" if body else f"# {title}\n"
+
+
+def _lens_from_indexed_chunks(db_path: Path, slug: str) -> str | None:
+    if not db_path.exists():
+        return None
+    try:
+        from .db import connect
+
+        con = connect(db_path)
+        try:
+            row = con.execute(
+                "SELECT c.text FROM chunk c JOIN source s ON s.id = c.source_id "
+                "WHERE s.path LIKE ? OR s.path LIKE ? "
+                "OR (s.workspace = 'lens' AND s.path LIKE ?) "
+                "ORDER BY c.ordinal LIMIT 1",
+                (f"%/lens/%/{slug}.md", f"%/lens/{slug}.md", f"%{slug}.md"),
+            ).fetchone()
+        finally:
+            con.close()
+    except Exception:
+        return None
+    if row is None:
+        return None
+    return f"# {slug}\n\n{row[0].strip()}\n"
