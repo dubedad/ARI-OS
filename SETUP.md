@@ -5,6 +5,15 @@ do-it-by-hand path: hand it to your assistant ("read SETUP.md and set this up")
 or follow it yourself. It mirrors exactly what `install.py` does — with the same
 safety rules.
 
+## Dependencies
+
+ARI-OS is a Python package. Install its dependencies once with
+`uv pip install -e .` (or `pip install -e .`): `sqlite-vec`, `scikit-learn`,
+`httpx`, `pyyaml`, `click`, `mcp`. The optional media extras
+(`pip install -e '.[media]'`) add `youtube-transcript-api` + `pillow` for
+EARS / LENS. An optional local [Ollama](https://ollama.com) provides semantic
+embeddings (`nomic-embed-text`) and the consolidation model (`gemma3:4b`).
+
 ## What gets installed
 
 ARI-OS adds files to your Claude Code directory (`~/.claude` by default,
@@ -22,6 +31,14 @@ override with `ARI_OS_CLAUDE_DIR`) and keeps its own state under `~/.ari-os`
    **only** between `<!-- ARI-OS:start -->` and `<!-- ARI-OS:end -->`. Content
    outside those markers is never modified. If the markers already exist,
    replace what is between them; otherwise append the block.
+5. **SessionStart hook + MCP server** → `~/.claude/settings.json` and
+   `~/.claude/.mcp.json` — registers the Cortex brain-context hook and the
+   `ari-os-cortex` MCP server (`brain.recall` / `lineage` / `regions`). Merged
+   idempotently; `--no-mcp` opts out.
+6. **Local brain** → `~/.ari-os/brain.db` — a fresh, empty SQLite brain is
+   created. The `--llm` backend choice (default `ollama`) is saved to
+   `~/.ari-os/config.json`; `--ears` / `--lens` opt into media ingest (off by
+   default). `--revert` / `--uninstall` never delete the brain.
 
 ## Non-negotiable safety rules
 
@@ -40,9 +57,9 @@ printed. Check status any time with `python3 -m ari_os.tools.arios keys`.
 
 ## Tuning your brain
 
-Use `arios cortex tune` to inspect the active cognitive mode and its retrieval
-weights. Use `arios cortex mode list|get|set <name>` to list, inspect, or switch
-modes.
+Use `python3 -m ari_os.tools.cortex tune` to inspect the active cognitive mode and
+its retrieval weights. Use `python3 -m ari_os.tools.cortex mode list|get|set
+<name>` to list, inspect, or switch modes.
 
 ## Verify
 
