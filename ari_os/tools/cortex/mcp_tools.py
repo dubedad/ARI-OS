@@ -10,6 +10,7 @@ user explicitly enables them.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 
@@ -141,25 +142,93 @@ def modes(db_path: Path) -> list:
     return result
 
 
-def see_image(db_path: Path, image_path: str, *, mode: str = "visual") -> dict:
+def see_image(
+    db_path: Path,
+    image_path: str,
+    *,
+    mode: str = "visual",
+    vision_client=None,
+    embed_client=None,
+) -> dict:
     """Image captioning + similar brain chunks (bimodal).
 
     Returns: {caption, similar_chunks: [...], note}
-
-    The ARI-OS public package ships without the private vision bridge /
-    image-caption backend, so the surface is preserved for client
-    compatibility but always returns a friendly "not supported" note.
-    Wire-format clients can detect the note and degrade gracefully.
     """
+    from . import config
+
+    if not config.lens_enabled():
+        return _see_off_response(
+            "brain.see is off because cortex.lens is off. "
+            "Enable it with `ari-os cortex lens on` after installing a "
+            "local vision backend."
+        )
+    if not _cortex_llm_enabled():
+        return _see_off_response(
+            "brain.see is off because cortex.llm is off. "
+            "Enable a local LLM backend before using image captioning."
+        )
+
+    from .media.vision_bridge import VisionUnavailable, see
+
+    try:
+        result = see(
+            db_path,
+            Path(image_path),
+            mode=mode,
+            vision_client=vision_client,
+            embed_client=embed_client,
+        )
+    except VisionUnavailable as exc:
+        return _see_off_response(
+            f"brain.see is unavailable: {exc}. "
+            "Start local Ollama with the llava model to enable image captioning."
+        )
+
     return {
-        "caption": None,
-        "similar_chunks": [],
-        "note": (
-            "brain.see is not supported in ARI-OS public package. "
-            "Image captioning requires the private vision bridge, which "
-            "is not part of the scrubbed public surface."
-        ),
+        "caption": result.caption,
+        "similar_chunks": [
+            {
+                "chunk_id": c.chunk_id,
+                "region": c.region,
+                "score": round(c.score, 4),
+                "text": c.text[:280],
+                "path": c.path,
+            }
+            for c in result.retrieval.chunks
+        ],
     }
+
+
+def _see_off_response(note: str) -> dict:
+    return {"caption": None, "similar_chunks": [], "note": note}
+
+
+def _cortex_llm_enabled() -> bool:
+    from . import config
+
+    env = os.environ.get("ARI_OS_LLM")
+    if env is not None:
+        return _llm_spec_enabled(env)
+
+    data = config.runtime_config()
+    value = data.get("cortex.llm")
+    if value is None:
+        cortex = data.get("cortex")
+        if isinstance(cortex, dict):
+            value = cortex.get("llm")
+    if value is None:
+        value = config.DEFAULT_LLM
+    return _llm_spec_enabled(value)
+
+
+def _llm_spec_enabled(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    spec = str(value or "").strip().lower()
+    if not spec:
+        return False
+    provider = spec.split(":", 1)[0]
+    return provider not in {"0", "false", "off", "none", "unavailable"}
 
 
 def lens(db_path: Path, slug: str) -> str:
