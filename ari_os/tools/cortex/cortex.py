@@ -1,4 +1,4 @@
-"""ARI-OS Cortex — click CLI: ``ingest``, ``retrieve``, ``mode``.
+"""ARI-OS Cortex — click CLI: ingest, retrieve, dream, wander, distill, mode.
 
 Public port + scrub of the heavy brain's CLI. Subcommands map 1:1 to the
 retrieval spine:
@@ -6,10 +6,10 @@ retrieval spine:
 - ``ingest`` — index a file or sweep default roots (writes chunks + vectors).
 - ``retrieve`` — run the hybrid (FTS+vec, region rerank, divisive-norm,
   kg_expand) pipeline and print the assembled regioned block.
+- ``dream`` — run deterministic sleep consolidation plus optional summaries.
+- ``wander`` — surface a bounded associative tangent.
+- ``distill`` — run a tiered consolidation pass.
 - ``mode`` — list / get / set / auto the active cognitive mode for a cwd.
-
-The mesh / distiller / dream / wander / kg subcommands of the private engine
-are intentionally NOT ported — ARI-OS is a single-machine brain.
 """
 from __future__ import annotations
 
@@ -154,6 +154,131 @@ def retrieve(
             posture_offer=result.posture_offer))
     except Exception as e:  # never block the consumer
         click.echo(f"## Brain — retrieval failed: {e}", err=True)
+
+
+# ---------------------------------------------------------------------------
+# dream / wander / distill
+# ---------------------------------------------------------------------------
+
+
+def _db_or_none(label: str) -> Path | None:
+    db = brain_db_path()
+    if not db.exists():
+        click.echo(f"{label}: brain not initialised at {db}")
+        return None
+    return db
+
+
+def _consolidation_llm():
+    try:
+        from . import llm as llm_mod
+        from .model_routing import model_for_stage
+
+        return llm_mod.get_llm(model_for_stage("consolidation"))
+    except Exception as exc:
+        click.echo(f"llm unavailable: {exc}; continuing with llm=off")
+        return None
+
+
+@main.command()
+def dream() -> None:
+    """Run the local dream pass: distill, decay, queue, and mode hint."""
+    db = _db_or_none("dream")
+    if db is None:
+        return
+
+    from . import dream as dream_mod
+
+    try:
+        result = dream_mod.run_dream(
+            db,
+            llm=_consolidation_llm(),
+            output_dir=state_home(),
+        )
+    except Exception as exc:
+        click.echo(f"dream: skipped ({exc})")
+        return
+
+    summaries = (
+        result.session_digests
+        + result.daily_syntheses
+        + result.weekly_arcs
+    )
+    click.echo(
+        "dream: "
+        f"summaries={summaries} "
+        f"session={result.session_digests} "
+        f"daily={result.daily_syntheses} "
+        f"weekly={result.weekly_arcs} "
+        f"queue={result.dream_queue_items} "
+        f"mode={result.mode}"
+    )
+
+
+@main.command()
+@click.option("--focus", required=True, help="Current focus text to wander away from.")
+def wander(focus: str) -> None:
+    """Surface one associative memory away from the current focus."""
+    from . import config
+
+    if not config.wander_enabled(True):
+        click.echo("wander off: cortex.wander disabled")
+        return
+
+    db = _db_or_none("wander")
+    if db is None:
+        return
+
+    try:
+        from .wander import render_wander_block, wander as run_wander
+
+        result = run_wander(db, focus)
+        block = render_wander_block(result)
+    except Exception as exc:
+        click.echo(f"wander empty: {exc}")
+        return
+
+    if block:
+        click.echo(block)
+    else:
+        click.echo("wander empty: no associative chunk surfaced")
+
+
+@main.command()
+@click.option(
+    "--tier",
+    type=click.Choice(["session", "daily", "weekly"]),
+    default="session",
+    show_default=True,
+    help="Consolidation tier to run.",
+)
+def distill(tier: str) -> None:
+    """Run one tiered distillation pass."""
+    db = _db_or_none("distill")
+    if db is None:
+        return
+
+    from . import distill as distill_mod
+
+    llm = _consolidation_llm()
+    try:
+        if tier == "session":
+            created = distill_mod.distill_session_to_digest(
+                db, output_dir=state_home(), llm=llm
+            )
+        elif tier == "daily":
+            created = distill_mod.distill_daily_synthesis(
+                db, output_dir=state_home(), llm=llm
+            )
+        else:
+            created = distill_mod.distill_weekly_arc(
+                db, output_dir=state_home(), llm=llm
+            )
+    except Exception as exc:
+        click.echo(f"distill: skipped ({exc})")
+        return
+
+    click.echo(f"distill: tier={tier} distilled={created}")
 
 
 # ---------------------------------------------------------------------------
