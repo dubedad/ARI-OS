@@ -157,7 +157,7 @@ def retrieve(
 
 
 # ---------------------------------------------------------------------------
-# dream / wander / distill
+# dream / wander / distill / predict / prefetch
 # ---------------------------------------------------------------------------
 
 
@@ -279,6 +279,87 @@ def distill(tier: str) -> None:
         return
 
     click.echo(f"distill: tier={tier} distilled={created}")
+
+
+@main.command()
+@click.option("--cluster", is_flag=True, help="Run one predictive clustering sweep.")
+@click.option("--signals", is_flag=True, help="Detect and write predictive growth signals.")
+@click.option("--cwd", default=None, help="Working directory to prefetch for after prediction.")
+def predict(cluster: bool, signals: bool, cwd: str | None) -> None:
+    """Run deterministic predictive maintenance: cluster sweep, signals, or cwd prefetch."""
+    from . import config
+
+    if not config.predictive_enabled(True):
+        click.echo("predict off: cortex.predictive disabled")
+        return
+
+    db = _db_or_none("predict")
+    if db is None:
+        return
+
+    ran = False
+    if cluster:
+        ran = True
+        try:
+            from .predictive.clusterer import run_cluster_sweep
+
+            run_id = run_cluster_sweep(db)
+        except Exception as exc:
+            click.echo(f"predict: cluster skipped ({exc})")
+        else:
+            click.echo(f"predict: cluster run_id={run_id}")
+
+    if signals:
+        ran = True
+        try:
+            from .predictive.signal_writer import write_signals
+            from .predictive.trend import detect_growth_signals
+
+            found = detect_growth_signals(db)
+            out = write_signals(found)
+        except Exception as exc:
+            click.echo(f"predict: signals skipped ({exc})")
+        else:
+            click.echo(f"predict: signals={len(found)} path={out}")
+
+    if cwd:
+        ran = True
+        try:
+            from .predictive.prefetch import prefetch_for_cwd
+
+            block = prefetch_for_cwd(db, cwd)
+        except Exception as exc:
+            click.echo(f"predict: prefetch skipped ({exc})")
+        else:
+            click.echo(block or "")
+
+    if not ran:
+        click.echo("predict: nothing selected; use --cluster, --signals, or --cwd <dir>")
+
+
+@main.command()
+@click.option("--cwd", required=True, help="Working directory to prefetch memories for.")
+def prefetch(cwd: str) -> None:
+    """Print a bounded workspace pre-fetch block for a cwd."""
+    from . import config
+
+    if not config.predictive_enabled(True):
+        click.echo("prefetch off: cortex.predictive disabled")
+        return
+
+    db = _db_or_none("prefetch")
+    if db is None:
+        return
+
+    try:
+        from .predictive.prefetch import prefetch_for_cwd
+
+        block = prefetch_for_cwd(db, cwd)
+    except Exception as exc:
+        click.echo(f"prefetch empty: {exc}")
+        return
+
+    click.echo(block or "")
 
 
 # ---------------------------------------------------------------------------
