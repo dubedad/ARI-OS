@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse, json, shutil, sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib import request
 from . import paths
 
 START = "<!-- ARI-OS:start -->"
@@ -233,7 +234,45 @@ def plan_actions(repo) -> list[tuple[str, Path, Path]]:
     return actions
 
 
-def apply(actions, dry_run: bool, register_mcp: bool = True):
+def _soft_check_ollama(config) -> None:
+    """Best-effort Ollama reachability hint; never blocks install."""
+    try:
+        request.urlopen(f"{config.OLLAMA_URL.rstrip('/')}/api/tags", timeout=0.25).close()
+    except Exception:
+        print(
+            f"ARI-OS hint: Ollama is not reachable at {config.OLLAMA_URL}; "
+            "install continued, but local LLM recall may be offline.",
+            file=sys.stderr,
+        )
+
+
+def bootstrap_heavy_brain(llm: str = "ollama", ears: bool = False, lens: bool = False) -> Path:
+    """Create the heavy brain and persist install-time cortex choices."""
+    if llm not in {"ollama", "api", "off"}:
+        raise ValueError("llm must be one of: ollama, api, off")
+    from ari_os.tools.cortex import config
+    from ari_os.tools.cortex.db import init_db
+
+    brain_path = init_db(config.brain_db_path())
+    config.set_config_value("cortex.llm", llm)
+    if ears:
+        config.set_config_value("cortex.ears", True)
+    if lens:
+        config.set_config_value("cortex.lens", True)
+    if llm == "ollama":
+        _soft_check_ollama(config)
+    return brain_path
+
+
+def apply(
+    actions,
+    dry_run: bool,
+    register_mcp: bool = True,
+    llm: str = "ollama",
+    ears: bool = False,
+    lens: bool = False,
+    bootstrap_brain: bool = True,
+):
     if dry_run:
         # MCP registration: even in dry-run we report intent.
         mcp_path = paths.claude_dir() / ".mcp.json"
@@ -262,6 +301,8 @@ def apply(actions, dry_run: bool, register_mcp: bool = True):
         mcp_path = write_mcp_servers(register=True)
         if mcp_path is not None:
             changes.append({"path": str(mcp_path), "backup": None, "kind": "mcp"})
+    if bootstrap_brain:
+        bootstrap_heavy_brain(llm=llm, ears=ears, lens=lens)
     manifest = {"version": _version(_repo_root()), "ts": _ts(), "changes": changes}
     paths.installed_manifest().parent.mkdir(parents=True, exist_ok=True)
     paths.installed_manifest().write_text(json.dumps(manifest, indent=2))
@@ -299,7 +340,17 @@ def uninstall(purge_keys: bool = False) -> None:
 
 def update(register_mcp: bool = True) -> None:
     # Re-apply from the repo; config.json + keychain keys are never touched.
-    apply(plan_actions(_repo_root()), dry_run=False, register_mcp=register_mcp)
+    apply(plan_actions(_repo_root()), dry_run=False, register_mcp=register_mcp,
+          bootstrap_brain=False)
+    try:
+        from ari_os.tools.cortex.config import brain_db_path
+        from ari_os.tools.cortex.db import migrate
+
+        brain_path = brain_db_path()
+        if brain_path.exists():
+            migrate(brain_path)
+    except Exception as exc:
+        print(f"ARI-OS brain migration skipped: {exc}")
 
 
 def main() -> None:
@@ -311,6 +362,13 @@ def main() -> None:
     ap.add_argument("--purge-keys", action="store_true")
     ap.add_argument("--no-mcp", action="store_true",
                     help="Skip registering the ARI-OS Cortex MCP server.")
+    ap.add_argument("--llm", choices=("ollama", "api", "off"), default="ollama",
+                    help="Cortex LLM backend to persist during install. "
+                         "Default/recommended: ollama for local-first recall.")
+    ap.add_argument("--ears", action="store_true",
+                    help="Opt in to EARS capture. Default is off.")
+    ap.add_argument("--lens", action="store_true",
+                    help="Opt in to LENS capture. Default is off.")
     a = ap.parse_args()
     register_mcp = not a.no_mcp
     if a.revert:
@@ -326,7 +384,8 @@ def main() -> None:
         print("ARI-OS updated.")
         return
     actions = apply(plan_actions(_repo_root()), dry_run=a.dry_run,
-                    register_mcp=register_mcp)
+                    register_mcp=register_mcp, llm=a.llm,
+                    ears=a.ears, lens=a.lens)
     verb = "Would apply" if a.dry_run else "Applied"
     for kind, dst in actions:
         print(f"{verb}: {kind} -> {dst}")

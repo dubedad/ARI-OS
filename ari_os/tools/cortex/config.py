@@ -79,6 +79,20 @@ def runtime_config() -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def set_config_value(dotted_key: str, value) -> Path:
+    """Persist a single value into ``$ARI_OS_HOME/config.json`` under the flat key.
+
+    Read-modify-write preserves all other keys. The flat key matches the read
+    paths in ``_config_value`` and cortex LLM checks, which check flat keys first.
+    """
+    path = state_home() / "config.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = runtime_config()
+    data[dotted_key] = value
+    path.write_text(json.dumps(data, indent=2))
+    return path
+
+
 def _config_value(dotted_key: str):
     data = runtime_config()
     if dotted_key in data:

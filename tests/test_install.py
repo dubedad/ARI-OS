@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 from ari_os import paths, install
 from ari_os.install import START
+from ari_os.tools.cortex import config, db
 
 
 def test_paths_honor_env(tmp_path, monkeypatch):
@@ -97,6 +99,74 @@ def test_install_is_idempotent(tmp_path, monkeypatch):
     before = (cdir / "CLAUDE.md").read_text()
     install.apply(install.plan_actions(repo), dry_run=False)
     assert (cdir / "CLAUDE.md").read_text() == before
+
+
+def test_install_bootstraps_heavy_brain(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("ARI_OS_CLAUDE_DIR", str(tmp_path / "claude"))
+    monkeypatch.delenv("ARI_OS_LLM", raising=False)
+    monkeypatch.delenv("ARI_OS_EARS", raising=False)
+    monkeypatch.delenv("ARI_OS_LENS", raising=False)
+    cdir = paths.claude_dir()
+    cdir.mkdir(parents=True)
+    (cdir / "CLAUDE.md").write_text("my rules\n")
+    repo = _seed_repo(tmp_path)
+
+    install.apply(install.plan_actions(repo), dry_run=False, llm="ollama")
+
+    brain_path = config.brain_db_path()
+    assert brain_path.exists()
+    con = db.connect(brain_path)
+    try:
+        tables = {
+            row[0]
+            for row in con.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual')"
+            )
+        }
+    finally:
+        con.close()
+    assert {"chunk", "chunk_vec", "meta"}.issubset(tables)
+    assert config._config_value("cortex.llm") == "ollama"
+    assert config.ears_enabled() is False
+    assert config.lens_enabled() is False
+
+    claude_md = cdir / "CLAUDE.md"
+    assert START in claude_md.read_text()
+    mcp = json.loads((cdir / ".mcp.json").read_text())
+    assert "ari-os-cortex" in mcp["mcpServers"]
+    settings = json.loads((cdir / "settings.json").read_text())
+    hooks = settings["hooks"]["SessionStart"]
+    assert any("ari_os.hooks.session_start_cortex" in h["command"] for h in hooks)
+
+    install.revert()
+    assert claude_md.read_text() == "my rules\n"
+    assert brain_path.exists()
+
+    install.apply(install.plan_actions(repo), dry_run=False, llm="ollama")
+    before = claude_md.read_text()
+    install.apply(install.plan_actions(repo), dry_run=False, llm="ollama")
+    assert brain_path.exists()
+    assert claude_md.read_text() == before
+
+
+def test_install_ears_lens_are_opt_in(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARI_OS_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("ARI_OS_CLAUDE_DIR", str(tmp_path / "claude"))
+    monkeypatch.delenv("ARI_OS_LLM", raising=False)
+    monkeypatch.delenv("ARI_OS_EARS", raising=False)
+    monkeypatch.delenv("ARI_OS_LENS", raising=False)
+    repo = _seed_repo(tmp_path)
+
+    install.apply(install.plan_actions(repo), dry_run=False, llm="ollama")
+    assert config.ears_enabled() is False
+    assert config.lens_enabled() is False
+
+    install.apply(install.plan_actions(repo), dry_run=False, llm="ollama", ears=True, lens=True)
+    assert config._config_value("cortex.ears") is True
+    assert config._config_value("cortex.lens") is True
+    assert config.ears_enabled() is True
+    assert config.lens_enabled() is True
 
 def test_claude_body_mentions_brain():
     body = install.CLAUDE_BODY

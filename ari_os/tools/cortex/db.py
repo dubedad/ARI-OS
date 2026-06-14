@@ -44,9 +44,43 @@ def _column_exists(con: sqlite3.Connection, table: str, col: str) -> bool:
     return any(r[1] == col for r in con.execute(f"PRAGMA table_info({table})"))
 
 
+def _table_exists(con: sqlite3.Connection, table: str) -> bool:
+    row = con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?",
+        (table,),
+    ).fetchone()
+    return row is not None
+
+
 def _add_col_if_missing(con: sqlite3.Connection, table: str, col: str, decl: str) -> None:
     if not _column_exists(con, table, col):
         con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+
+
+def _backfill_heavy_columns(con: sqlite3.Connection) -> None:
+    """Add heavy-schema columns to pre-existing light source/chunk tables."""
+    if _table_exists(con, "source"):
+        _add_col_if_missing(con, "source", "path", "TEXT NOT NULL DEFAULT ''")
+        _add_col_if_missing(con, "source", "layer", "TEXT NOT NULL DEFAULT 'semantic'")
+        _add_col_if_missing(con, "source", "workspace", "TEXT")
+        _add_col_if_missing(con, "source", "mtime", "INTEGER NOT NULL DEFAULT 0")
+        _add_col_if_missing(con, "source", "sha256", "TEXT NOT NULL DEFAULT ''")
+        _add_col_if_missing(con, "source", "last_indexed_at", "INTEGER NOT NULL DEFAULT 0")
+    if _table_exists(con, "chunk"):
+        _add_col_if_missing(con, "chunk", "source_id", "INTEGER NOT NULL DEFAULT 0")
+        _add_col_if_missing(con, "chunk", "ordinal", "INTEGER NOT NULL DEFAULT 0")
+        _add_col_if_missing(con, "chunk", "line_start", "INTEGER NOT NULL DEFAULT 1")
+        _add_col_if_missing(con, "chunk", "line_end", "INTEGER NOT NULL DEFAULT 1")
+        _add_col_if_missing(con, "chunk", "region", "TEXT NOT NULL DEFAULT 'semantic'")
+        _add_col_if_missing(con, "chunk", "importance", "REAL NOT NULL DEFAULT 0.5")
+        _add_col_if_missing(con, "chunk", "retrieved_count", "INTEGER NOT NULL DEFAULT 0")
+        _add_col_if_missing(con, "chunk", "last_retrieved_at", "INTEGER")
+        _add_col_if_missing(con, "chunk", "distillation_tier", "INTEGER NOT NULL DEFAULT 0")
+        _add_col_if_missing(con, "chunk", "parent_chunks", "TEXT")
+        _add_col_if_missing(con, "chunk", "distilled_at", "INTEGER")
+        _add_col_if_missing(con, "chunk", "consolidated_at", "INTEGER")
+        _add_col_if_missing(con, "chunk", "session_id", "TEXT")
+        _add_col_if_missing(con, "chunk", "created_ts", "INTEGER")
 
 
 def _migrate_column_guards(con: sqlite3.Connection) -> None:
@@ -101,6 +135,32 @@ def init_db(db_path: Path | None = None) -> Path:
         # Either way, run column guards so partial-migration DBs catch up.
         _migrate_column_guards(con)
         # Backfill FTS index from content table (no-op on empty DBs).
+        con.execute("INSERT INTO chunk_fts(chunk_fts) VALUES('rebuild')")
+        con.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        _set_meta(con, "schema_version", str(SCHEMA_VERSION))
+    finally:
+        con.close()
+    return p
+
+
+def migrate(db_path: Path | None = None) -> Path:
+    """Upgrade a light cortex.db to the heavy schema, non-destructively.
+
+    Additive + idempotent: applies the full (CREATE ... IF NOT EXISTS) schema,
+    backfills any missing heavy columns, rebuilds the FTS mirror, and bumps the
+    schema version. NEVER drops or deletes user rows. Embedding-free.
+    """
+    p = (Path(db_path) if db_path is not None else brain_db_path()).resolve()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    con = connect(p)
+    try:
+        schema_sql = (Path(__file__).parent / "schema.sql").read_text()
+        # Pre-existing light tables need indexed columns before schema.sql can
+        # create heavy indexes/triggers against them.
+        _backfill_heavy_columns(con)
+        con.executescript(schema_sql)
+        _backfill_heavy_columns(con)
+        _migrate_column_guards(con)
         con.execute("INSERT INTO chunk_fts(chunk_fts) VALUES('rebuild')")
         con.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         _set_meta(con, "schema_version", str(SCHEMA_VERSION))

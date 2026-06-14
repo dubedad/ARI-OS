@@ -362,6 +362,42 @@ def prefetch(cwd: str) -> None:
     click.echo(block or "")
 
 
+@main.command("tune")
+@click.option("--cwd", default=None, help="cwd whose active mode to inspect (default: $PWD).")
+def tune(cwd: str | None) -> None:
+    """Inspect retrieval tuning: the active mode's rerank weights + how to adjust."""
+    from .modes.loader import active_mode_for_cwd, list_modes, load_mode
+
+    name = active_mode_for_cwd(cwd or os.getcwd(), home_dir=state_home())
+    params = load_mode(name)
+    click.echo(f"active mode: {name}")
+    click.echo(f"  region_weights: {params.get('region_weights')}")
+    click.echo(f"  tier_weights:   {params.get('tier_weights')}")
+    click.echo(
+        f"  k_vector={params.get('k_vector')} "
+        f"kg_expand={params.get('kg_expand')} "
+        f"token_budget={params.get('token_budget')}"
+    )
+    click.echo(f"available modes: {', '.join(list_modes())}")
+    click.echo(
+        "Tune by switching modes (`arios cortex mode set <name>`) or editing the "
+        "mode YAMLs under modes/. See README -> 'Tuning your brain'."
+    )
+
+
+@main.command("llm")
+@click.argument("backend", required=False, type=click.Choice(["ollama", "api", "off"]))
+def llm_cmd(backend: str | None) -> None:
+    """Get or set the cortex LLM backend (ollama | api | off)."""
+    from . import config
+
+    if backend is None:
+        click.echo(config._config_value("cortex.llm") or config.DEFAULT_LLM)
+        return
+    config.set_config_value("cortex.llm", backend)
+    click.echo(f"cortex.llm set: {backend}")
+
+
 # ---------------------------------------------------------------------------
 # media
 # ---------------------------------------------------------------------------
