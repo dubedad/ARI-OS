@@ -362,6 +362,19 @@ def prefetch(cwd: str) -> None:
     click.echo(block or "")
 
 
+@main.command("llm")
+@click.argument("backend", required=False, type=click.Choice(["ollama", "api", "off"]))
+def llm_cmd(backend: str | None) -> None:
+    """Get or set the cortex LLM backend (ollama | api | off)."""
+    from . import config
+
+    if backend is None:
+        click.echo(config._config_value("cortex.llm") or config.DEFAULT_LLM)
+        return
+    config.set_config_value("cortex.llm", backend)
+    click.echo(f"cortex.llm set: {backend}")
+
+
 # ---------------------------------------------------------------------------
 # media
 # ---------------------------------------------------------------------------
