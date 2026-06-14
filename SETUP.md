@@ -38,6 +38,12 @@ API keys resolve from environment variables first (e.g. `ANTHROPIC_API_KEY`),
 then from the macOS Keychain service `com.ari-os.keys`. Key values are never
 printed. Check status any time with `python3 -m ari_os.tools.arios keys`.
 
+## Tuning your brain
+
+Use `arios cortex tune` to inspect the active cognitive mode and its retrieval
+weights. Use `arios cortex mode list|get|set <name>` to list, inspect, or switch
+modes.
+
 ## Verify
 
 ```bash

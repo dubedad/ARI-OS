@@ -214,6 +214,23 @@ python3 -m ari_os.tools.arios keys
 python3 -m ari_os.tools.arios theme stipple
 ```
 
+## Tuning your brain
+
+The brain reranks recall by cognitive mode. Each mode is a small parameter set:
+region weights, tier weights, how many vector results to pull, graph expansion,
+and the token budget for the final context block.
+
+```bash
+arios cortex tune
+arios cortex mode list
+arios cortex mode get
+arios cortex mode set wide
+```
+
+Use `arios cortex tune` to inspect the active mode. Switch modes with
+`arios cortex mode set <name>`, or customize the bundled YAML files in
+`ari_os/tools/cortex/modes/`.
+
 ## Lifecycle
 
 ```
