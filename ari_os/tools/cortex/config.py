@@ -110,3 +110,11 @@ def wander_enabled(default: bool = True) -> bool:
     if env is not None:
         return env.strip().lower() in {"1", "true", "yes", "on"}
     return config_bool("cortex.wander", default)
+
+
+def council_enabled(default: bool = False) -> bool:
+    """Return the global ``cortex.council`` toggle."""
+    env = os.environ.get("ARI_OS_COUNCIL")
+    if env is not None:
+        return env.strip().lower() in {"1", "true", "yes", "on"}
+    return config_bool("cortex.council", default)

@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "neutral": true,
+  "description": "Neutral seed for council salience. Every published region has salience 1.0 in the aggregate row, and no task-specific rows ship. Users can replace this with local calibration under ARI_OS_HOME.",
+  "built_from": {
+    "artifact": "neutral-defaults"
+  },
+  "policy": {
+    "normalizer": "uniform",
+    "surface": [
+      "frontoparietal",
+      "wernicke",
+      "broca",
+      "occipital",
+      "parietal",
+      "hippocampus"
+    ],
+    "latent_floors_weight": {
+      "vmpfc": 1.0
+    },
+    "conf_floor": 0.35
+  },
+  "row_mean_w": {
+    "__all__": 1.0
+  },
+  "aggregate": {
+    "wernicke": 1.0,
+    "broca": 1.0,
+    "occipital": 1.0,
+    "parietal": 1.0,
+    "hippocampus": 1.0,
+    "vmpfc": 1.0,
+    "frontoparietal": 1.0
+  },
+  "table": {},
+  "provenance": {
+    "kind": "neutral-public-seed",
+    "calibrated_rows": 0
+  }
+}
