@@ -300,6 +300,15 @@ def uninstall(purge_keys: bool = False) -> None:
 def update(register_mcp: bool = True) -> None:
     # Re-apply from the repo; config.json + keychain keys are never touched.
     apply(plan_actions(_repo_root()), dry_run=False, register_mcp=register_mcp)
+    try:
+        from ari_os.tools.cortex.config import brain_db_path
+        from ari_os.tools.cortex.db import migrate
+
+        brain_path = brain_db_path()
+        if brain_path.exists():
+            migrate(brain_path)
+    except Exception as exc:
+        print(f"ARI-OS brain migration skipped: {exc}")
 
 
 def main() -> None:
