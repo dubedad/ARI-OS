@@ -47,6 +47,14 @@ def build_server(
     def brain_tracts(n: int = 100) -> list:
         return mcp_tools.tracts(db, n=n)
 
+    @mcp.tool(name="brain.entities", description="Return KG entities ordered by mention count and confidence.")
+    def brain_entities(kind: str | None = None, k: int = 50) -> list:
+        return mcp_tools.entities(db, kind=kind, k=k)
+
+    @mcp.tool(name="brain.relations", description="Return KG relations, optionally constrained to one entity.")
+    def brain_relations(entity: str | None = None, k: int = 50) -> list:
+        return mcp_tools.relations(db, entity=entity, k=k)
+
     @mcp.tool(name="brain.modes", description="List available mode YAML files.")
     def brain_modes() -> list:
         return mcp_tools.modes(db)

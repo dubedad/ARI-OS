@@ -282,6 +282,91 @@ def distill(tier: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# kg
+# ---------------------------------------------------------------------------
+
+
+@main.group()
+def kg() -> None:
+    """Knowledge graph extraction and read-only inspection."""
+
+
+@kg.command("extract")
+@click.option("--limit", default=None, type=int, help="Maximum chunks to extract this run.")
+def kg_extract(limit: int | None) -> None:
+    """Populate KG tables from eligible chunks."""
+    from . import config
+    from .kg.sweep import LLMUnavailable, populate_kg_incremental
+
+    if not config.kg_enabled(False):
+        click.echo("kg off: cortex.kg disabled")
+        return
+
+    db = _db_or_none("kg extract")
+    if db is None:
+        return
+
+    try:
+        stats = populate_kg_incremental(db, limit=limit)
+    except LLMUnavailable as exc:
+        click.echo(f"kg extract: skipped ({exc})")
+        return
+    except Exception as exc:
+        click.echo(f"kg extract: skipped ({exc})")
+        return
+
+    click.echo(
+        "kg extract: "
+        f"chunks={stats.chunks_processed} "
+        f"entities={stats.entities_upserted} "
+        f"relations={stats.relations_upserted} "
+        f"skipped={stats.skipped} "
+        f"failed={stats.failed}"
+    )
+
+
+@kg.command("list")
+@click.option("--kind", default=None, help="Filter entities by kind.")
+@click.option("-k", "limit", default=50, show_default=True, type=int)
+def kg_list(kind: str | None, limit: int) -> None:
+    """List KG entities."""
+    db = _db_or_none("kg list")
+    if db is None:
+        return
+
+    from .mcp_tools import entities
+
+    rows = entities(db, kind=kind, k=limit)
+    if not rows:
+        click.echo("kg list: empty")
+        return
+    for row in rows:
+        click.echo(
+            f"{row['id']}\t{row['kind']}\t{row['name']}\t"
+            f"mentions={row['mention_count']}\tconfidence={row['confidence']}"
+        )
+
+
+@kg.command("stats")
+def kg_stats() -> None:
+    """Print KG entity, relation, and chunk-link counts."""
+    db = _db_or_none("kg stats")
+    if db is None:
+        return
+
+    from .db import connect
+
+    con = connect(db)
+    try:
+        entity_count = con.execute("SELECT COUNT(*) FROM kg_entity").fetchone()[0]
+        relation_count = con.execute("SELECT COUNT(*) FROM kg_relation").fetchone()[0]
+        link_count = con.execute("SELECT COUNT(*) FROM kg_entity_chunk").fetchone()[0]
+    finally:
+        con.close()
+    click.echo(f"kg stats: entities={entity_count} relations={relation_count} links={link_count}")
+
+
+# ---------------------------------------------------------------------------
 # mode
 # ---------------------------------------------------------------------------
 
