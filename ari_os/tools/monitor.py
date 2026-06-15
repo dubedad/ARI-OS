@@ -13,8 +13,8 @@ PORT = 7777
 DEFAULT_THEME = "beige"
 
 # Both themes share the System 7 stipple style (a 4px dot pattern over a
-# vertical gradient); only the palette differs. `stipple` is the aris-space
-# wallpaper. Selected via $ARI_OS_MONITOR_THEME or the control panel.
+# vertical gradient); only the palette differs. Selected via
+# $ARI_OS_MONITOR_THEME or the control panel.
 THEMES = {
     "beige": ("radial-gradient(circle at 0 0,rgba(255,255,255,0.4) 1px,transparent 1.5px),"
               "linear-gradient(180deg,#D6D2C4 0%,#C9C4B8 100%)"),

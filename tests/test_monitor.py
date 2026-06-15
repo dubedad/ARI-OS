@@ -32,7 +32,7 @@ def test_themes_share_stipple_style_but_differ_in_palette():
     assert "background-size:4px 4px" in beige and "background-size:4px 4px" in stipple
     # fill layer must not tile (only the stipple repeats)
     assert "no-repeat" in beige and "no-repeat" in stipple
-    # stipple carries the aris-space lavender->pink palette
+    # stipple carries the lavender->pink palette
     assert "#C8A8E9" in stipple and "#F2B8DC" in stipple
 
 

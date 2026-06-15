@@ -3,11 +3,16 @@ CLAUDE.md block — all backed up + recorded so --revert / --uninstall / --updat
 are exact. Non-destructive: edits stay inside managed markers; settings.json is
 parsed + merged, never rewritten."""
 from __future__ import annotations
-import argparse, json, shutil, sys
+import argparse, json, os, shutil, sys
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib import request
 from . import paths
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility.
+    tomllib = None
 
 START = "<!-- ARI-OS:start -->"
 END = "<!-- ARI-OS:end -->"
@@ -40,9 +45,15 @@ def backup(path) -> Path | None:
     if not path.exists():
         return None
     dest_dir = paths.backups_dir() / _ts()
-    dest_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
     dest = dest_dir / path.name
-    shutil.copy2(path, dest)
+    try:
+        shutil.copy2(path, dest)
+    except OSError:
+        return None
     return dest
 
 
@@ -138,7 +149,10 @@ def write_mcp_servers(register: bool = True) -> Path | None:
     if not register:
         return None
     cd = paths.claude_dir()
-    cd.mkdir(parents=True, exist_ok=True)
+    try:
+        cd.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
     mcp_json = cd / ".mcp.json"
     existing: dict = {}
     if mcp_json.exists():
@@ -147,32 +161,172 @@ def write_mcp_servers(register: bool = True) -> Path | None:
         except (json.JSONDecodeError, OSError):
             existing = {}
     backup(mcp_json)  # best-effort; no-op if file didn't exist
-    mcp_json.write_text(json.dumps(merge_mcp_servers(existing), indent=2))
+    try:
+        mcp_json.write_text(json.dumps(merge_mcp_servers(existing), indent=2))
+    except OSError:
+        return None
     return mcp_json
 
 
-def unregister_mcp_server() -> bool:
-    """Remove the ARI-OS Cortex MCP server entry from ``$CLAUDE_DIR/.mcp.json``.
+def _config_dir(env_var: str, default: str, create_explicit: bool = True) -> Path | None:
+    """Return a harness config dir, creating only when explicitly configured."""
+    configured = os.environ.get(env_var)
+    if configured:
+        path = Path(os.path.expanduser(configured))
+        if create_explicit:
+            path.mkdir(parents=True, exist_ok=True)
+        return path
+    path = Path(os.path.expanduser(default))
+    return path if path.is_dir() else None
 
-    Returns True if the entry was present and removed, False otherwise.
-    Non-ARI-OS entries are preserved.
+
+def _write_json_mcp_servers(config_path: Path) -> Path | None:
+    existing: dict = {}
+    if config_path.exists():
+        try:
+            existing = json.loads(config_path.read_text() or "{}")
+        except (json.JSONDecodeError, OSError):
+            return None
+    backup(config_path)
+    try:
+        config_path.write_text(json.dumps(merge_mcp_servers(existing), indent=2))
+    except OSError:
+        return None
+    return config_path
+
+
+def _strip_codex_mcp_server_toml(text: str) -> str:
+    """Remove our Codex MCP TOML table, preserving all user-owned tables."""
+    owned = f"mcp_servers.{MCP_SERVER_NAME}"
+    kept: list[str] = []
+    skipping = False
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            table = stripped.strip("[]").strip()
+            skipping = table == owned or table.startswith(f"{owned}.")
+        if not skipping:
+            kept.append(line)
+    return "".join(kept).rstrip()
+
+
+def _codex_mcp_server_toml() -> str:
+    return (
+        f"[mcp_servers.{MCP_SERVER_NAME}]\n"
+        f"command = {json.dumps(MCP_SERVER_COMMAND)}\n"
+        f"args = {json.dumps(MCP_SERVER_ARGS)}\n"
+    )
+
+
+def _write_codex_mcp_server() -> Path | None:
+    codex_dir = _config_dir("CODEX_HOME", "~/.codex")
+    if codex_dir is None:
+        return None
+    config_toml = codex_dir / "config.toml"
+    text = config_toml.read_text() if config_toml.exists() else ""
+    if tomllib is not None and text:
+        try:
+            tomllib.loads(text)
+        except tomllib.TOMLDecodeError:
+            return None
+    elif tomllib is None and text:
+        return None
+    backup(config_toml)
+    stripped = _strip_codex_mcp_server_toml(text)
+    prefix = f"{stripped}\n\n" if stripped else ""
+    try:
+        config_toml.write_text(prefix + _codex_mcp_server_toml())
+    except OSError:
+        return None
+    return config_toml
+
+
+def _write_gemini_mcp_server() -> Path | None:
+    gemini_dir = _config_dir("GEMINI_DIR", "~/.gemini")
+    if gemini_dir is None:
+        return None
+    return _write_json_mcp_servers(gemini_dir / "settings.json")
+
+
+def write_all_mcp_registrations(register: bool = True) -> dict[str, str]:
+    """Register the Cortex MCP server into every supported local harness.
+
+    Kimi is intentionally omitted until its CLI documents a stable MCP config
+    path. Missing harness config directories are skipped, except explicit env
+    overrides which are treated as installer targets.
     """
-    cd = paths.claude_dir()
-    mcp_json = cd / ".mcp.json"
-    if not mcp_json.exists():
+    if not register:
+        return {}
+    written: dict[str, str] = {}
+    claude = write_mcp_servers(register=True)
+    if claude is not None:
+        written["claude"] = str(claude)
+    codex = _write_codex_mcp_server()
+    if codex is not None:
+        written["codex"] = str(codex)
+    gemini = _write_gemini_mcp_server()
+    if gemini is not None:
+        written["gemini"] = str(gemini)
+    return written
+
+
+def _unregister_json_mcp_server(path: Path) -> bool:
+    if not path.exists():
         return False
     try:
-        existing = json.loads(mcp_json.read_text() or "{}")
+        existing = json.loads(path.read_text() or "{}")
     except (json.JSONDecodeError, OSError):
         return False
     servers = existing.get("mcpServers") or {}
     if MCP_SERVER_NAME not in servers:
         return False
-    backup(mcp_json)
+    backup(path)
     del servers[MCP_SERVER_NAME]
     existing["mcpServers"] = servers
-    mcp_json.write_text(json.dumps(existing, indent=2))
+    try:
+        path.write_text(json.dumps(existing, indent=2))
+    except OSError:
+        return False
     return True
+
+
+def _unregister_codex_mcp_server() -> bool:
+    codex_dir = _config_dir("CODEX_HOME", "~/.codex", create_explicit=False)
+    if codex_dir is None:
+        return False
+    config_toml = codex_dir / "config.toml"
+    if not config_toml.exists():
+        return False
+    text = config_toml.read_text()
+    stripped = _strip_codex_mcp_server_toml(text)
+    if stripped == text.rstrip():
+        return False
+    backup(config_toml)
+    try:
+        config_toml.write_text(f"{stripped}\n" if stripped else "")
+    except OSError:
+        return False
+    return True
+
+
+def _unregister_gemini_mcp_server() -> bool:
+    gemini_dir = _config_dir("GEMINI_DIR", "~/.gemini", create_explicit=False)
+    if gemini_dir is None:
+        return False
+    return _unregister_json_mcp_server(gemini_dir / "settings.json")
+
+
+def unregister_mcp_server() -> bool:
+    """Remove the ARI-OS Cortex MCP server entry from all registered harnesses.
+
+    Returns True if the entry was present and removed, False otherwise.
+    Non-ARI-OS entries are preserved.
+    """
+    cd = paths.claude_dir()
+    removed = _unregister_json_mcp_server(cd / ".mcp.json")
+    removed = _unregister_codex_mcp_server() or removed
+    removed = _unregister_gemini_mcp_server() or removed
+    return removed
 
 
 # --- SessionStart hook registration (reversible, managed) ------------------
@@ -275,10 +429,19 @@ def apply(
 ):
     if dry_run:
         # MCP registration: even in dry-run we report intent.
-        mcp_path = paths.claude_dir() / ".mcp.json"
         if register_mcp:
+            mcp_paths = {
+                "claude": str(paths.claude_dir() / ".mcp.json"),
+            }
+            codex_dir = _config_dir("CODEX_HOME", "~/.codex", create_explicit=False)
+            if codex_dir is not None:
+                mcp_paths["codex"] = str(codex_dir / "config.toml")
+            gemini_dir = _config_dir("GEMINI_DIR", "~/.gemini", create_explicit=False)
+            if gemini_dir is not None:
+                mcp_paths["gemini"] = str(gemini_dir / "settings.json")
             return [(k, str(dst)) for (k, _src, dst) in actions] + [
-                ("mcp", MCP_SERVER_MODULE, str(mcp_path))
+                (f"mcp:{harness}", MCP_SERVER_MODULE, path)
+                for harness, path in mcp_paths.items()
             ]
         return [(k, str(dst)) for (k, _src, dst) in actions]
     changes = []
@@ -298,9 +461,13 @@ def apply(
         changes.append({"path": str(dst), "backup": str(b) if b else None})
     # MCP server registration (default on; opt out with --no-mcp).
     if register_mcp:
-        mcp_path = write_mcp_servers(register=True)
-        if mcp_path is not None:
-            changes.append({"path": str(mcp_path), "backup": None, "kind": "mcp"})
+        for harness, mcp_path in write_all_mcp_registrations(register=True).items():
+            changes.append({
+                "path": mcp_path,
+                "backup": None,
+                "kind": "mcp",
+                "harness": harness,
+            })
     if bootstrap_brain:
         bootstrap_heavy_brain(llm=llm, ears=ears, lens=lens)
     manifest = {"version": _version(_repo_root()), "ts": _ts(), "changes": changes}

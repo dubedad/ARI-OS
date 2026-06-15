@@ -1,7 +1,11 @@
 [project]
 name = "ari-os"
-version = "0.1.0"
+version = "2.0.0"
 requires-python = ">=3.10"
+license = { text = "PolyForm Noncommercial License 1.0.0" }
+classifiers = [
+    "License :: Other/Proprietary License",
+]
 dependencies = [
     "sqlite-vec>=0.1.6",
     "scikit-learn>=1.3",

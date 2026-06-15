@@ -9,9 +9,56 @@ user explicitly enables them.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
+
+
+def remember(
+    db_path: Path,
+    text: str,
+    *,
+    layer: str = "semantic",
+    source: str | None = None,
+    embed_client=None,
+) -> dict:
+    """Store one memory chunk, deduping identical text by content-hash source."""
+    from . import index
+    from .db import connect
+
+    text = text.strip()
+    if not text:
+        raise ValueError("remember: text is empty")
+    if source is None:
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        source = f"remember:{digest}"
+    if embed_client is None:
+        from .embed import EmbedClient
+        embed_client = EmbedClient()
+
+    cid = index.index_text(
+        db_path,
+        text,
+        source=source,
+        layer=layer,
+        embed_client=embed_client,
+    )
+
+    con = connect(db_path)
+    try:
+        row = con.execute(
+            "SELECT region, importance FROM chunk WHERE id = ?",
+            (cid,),
+        ).fetchone()
+    finally:
+        con.close()
+    return {
+        "id": cid,
+        "source": source,
+        "region": row[0] if row else None,
+        "importance": row[1] if row else None,
+    }
 
 
 def recall(

@@ -186,6 +186,11 @@ running a crew, not waiting on a queue of one.
 
 ## Install
 
+> **Note on dependencies.** The current heavy generation runs on a small set of
+> runtime dependencies (`mcp`, `sqlite-vec`, `scikit-learn`, `httpx`, `pyyaml`,
+> `click`, `requests`) installed via `uv pip install -e .`. This supersedes the
+> earlier light brain's "pure-stdlib, zero-dependency" design.
+
 ```
 ┌─ INSTALL ────────────────────────────────────────────────┐
 │ python3 install.py        easy wizard                    │

@@ -35,6 +35,10 @@ def build_server(
     def brain_recall(query: str, mode: str = "default", k: int = 12, token_budget: int = 4000, session_id: str | None = None) -> str:
         return mcp_tools.recall(db, query, mode=mode, k=k, token_budget=token_budget, session_id=session_id)
 
+    @mcp.tool(name="brain.remember", description="Store a memory in the brain. Deduplicates identical text.")
+    def brain_remember(text: str, layer: str = "semantic", source: str | None = None) -> dict:
+        return mcp_tools.remember(db, text, layer=layer, source=source)
+
     @mcp.tool(name="brain.lineage", description="Walk a chunk's parent lineage back to its raw source.")
     def brain_lineage(chunk_id: int) -> dict:
         return mcp_tools.lineage(db, chunk_id)

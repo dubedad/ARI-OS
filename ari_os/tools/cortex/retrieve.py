@@ -766,41 +766,42 @@ def retrieve(
     # history.
     suff, reason = "strong", ""
 
-    _event_id = record_retrieval_event(
-        db_path, query, cwd, branch, mode, consumer, returned_ids,
-        top_distance=d_top, session_id=session_id)
-    _tokens_packed = sum(int(len(c.text.split()) * 1.3) for c in packed)
-    _per_zone: dict[str, int] = {}
-    for c in packed:
-        if c.zone:
-            _per_zone[c.zone] = _per_zone.get(c.zone, 0) + 1
-    # Accrual gate: per-task stats may only count rows whose label carries
-    # authority. Classifier abstains and synthetic `cwd=` SessionStart
-    # pre-fetches log intent=NULL. Confidence still logs.
-    _intent_accruable = not _task_abstained and not query.startswith("cwd=")
-    record_retrieval_metrics(
-        db_path,
-        retrieval_event_id=_event_id,
-        intent=_task_type if _intent_accruable else None,
-        confidence=_task_confidence,
-        tokens_budget=_tb,
-        tokens_packed=_tokens_packed,
-        n_zones=len(_per_zone),
-        per_zone=_per_zone,
-        assembler_on=ASSEMBLER_ENABLED,
-        latency_ms=(time.monotonic() - _t_start) * 1000.0,
-    )
-    if session_id:
-        try:
-            from . import council, council_marker
+    if consumer != "mcp":
+        _event_id = record_retrieval_event(
+            db_path, query, cwd, branch, mode, consumer, returned_ids,
+            top_distance=d_top, session_id=session_id)
+        _tokens_packed = sum(int(len(c.text.split()) * 1.3) for c in packed)
+        _per_zone: dict[str, int] = {}
+        for c in packed:
+            if c.zone:
+                _per_zone[c.zone] = _per_zone.get(c.zone, 0) + 1
+        # Accrual gate: per-task stats may only count rows whose label carries
+        # authority. Classifier abstains and synthetic `cwd=` SessionStart
+        # pre-fetches log intent=NULL. Confidence still logs.
+        _intent_accruable = not _task_abstained and not query.startswith("cwd=")
+        record_retrieval_metrics(
+            db_path,
+            retrieval_event_id=_event_id,
+            intent=_task_type if _intent_accruable else None,
+            confidence=_task_confidence,
+            tokens_budget=_tb,
+            tokens_packed=_tokens_packed,
+            n_zones=len(_per_zone),
+            per_zone=_per_zone,
+            assembler_on=ASSEMBLER_ENABLED,
+            latency_ms=(time.monotonic() - _t_start) * 1000.0,
+        )
+        if session_id:
+            try:
+                from . import council, council_marker
 
-            council_marker.record_tier(
-                session_id,
-                "normal" if council.enabled() else "static",
-            )
-        except Exception:
-            pass
-    update_hebbian_edges(db_path, returned_ids)
+                council_marker.record_tier(
+                    session_id,
+                    "normal" if council.enabled() else "static",
+                )
+            except Exception:
+                pass
+        update_hebbian_edges(db_path, returned_ids)
     return RetrievalResult(
         chunks=packed, query=query, mode=mode, cwd=cwd, branch=branch,
         sufficiency=suff, top_distance=d_top, reason=reason,
