@@ -8,14 +8,16 @@ from __future__ import annotations
 import argparse, json, os, subprocess, sys, uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from .. import paths
 from . import state
 
 EXECUTORS = {"haiku", "sonnet", "opus"}
 _READONLY_TOOLS = "Write,Edit,MultiEdit,NotebookEdit"
+_FALSEY = {"0", "false", "no"}
 
 
 def worker_id(label: str) -> str:
-    return f"w-{uuid.uuid4().hex[:4]}-{label}"
+    return f"w-{uuid.uuid4().hex[:4]}-{paths.safe_segment(label)}"
 
 
 def is_repo_root(path: str) -> bool:
@@ -30,10 +32,12 @@ def is_repo_root(path: str) -> bool:
         return False
 
 
-def build_claude_argv(executor: str, task: str, cwd: str,
+def build_claude_argv(executor: str, cwd: str,
                       add_dirs: list[str], read_only: bool) -> list[str]:
-    argv = ["claude", "-p", task, "--model", executor,
-            "--dangerously-skip-permissions"]
+    argv = ["claude", "-p", "--model", executor]
+    skip_permissions = os.environ.get("ARI_OS_WORKER_SKIP_PERMISSIONS", "1")
+    if skip_permissions.strip().lower() not in _FALSEY:
+        argv.append("--dangerously-skip-permissions")
     for d in add_dirs:
         argv += ["--add-dir", d]
     if read_only:
@@ -41,11 +45,17 @@ def build_claude_argv(executor: str, task: str, cwd: str,
     return argv
 
 
-def spawn(wid: str, argv: list[str], cwd: str) -> int:
+def spawn(wid: str, argv: list[str], cwd: str, task: str) -> int:
     log = state.state_dir() / "logs" / f"{wid}.log"
-    fh = open(log, "w")
-    proc = subprocess.Popen(argv, cwd=cwd, stdout=fh, stderr=subprocess.STDOUT,
+    fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    fh = os.fdopen(fd, "w")
+    proc = subprocess.Popen(argv, cwd=cwd, stdin=subprocess.PIPE,
+                            stdout=fh, stderr=subprocess.STDOUT,
                             start_new_session=True)
+    if proc.stdin is not None:
+        proc.stdin.write(task.encode())
+        proc.stdin.close()
+    fh.close()
     return proc.pid
 
 
@@ -59,15 +69,19 @@ def cmd_start(a) -> None:
     if is_repo_root(a.cwd):
         sys.exit("Refusing to run a worker at a git repo ROOT. "
                  "Use a worktree or subdirectory as --cwd.")
+    for d in (a.add_dir or []):
+        if d.startswith("-"):
+            sys.exit(f"Refusing --add-dir value that looks like a flag: {d!r}")
     task = Path(a.task_file).read_text()
     wid = worker_id(a.label)
-    argv = build_claude_argv(a.executor, task, a.cwd, a.add_dir or [], a.read_only)
-    pid = spawn(wid, argv, a.cwd)
-    workers = state.read_workers()
-    workers.append({"id": wid, "label": a.label, "executor": a.executor,
-                    "cwd": a.cwd, "status": "running", "pid": pid,
-                    "started_at": _now()})
-    state.write_workers(workers)
+    argv = build_claude_argv(a.executor, a.cwd, a.add_dir or [], a.read_only)
+    pid = spawn(wid, argv, a.cwd, task)
+    with state.locked():
+        workers = state.read_workers()
+        workers.append({"id": wid, "label": a.label, "executor": a.executor,
+                        "cwd": a.cwd, "status": "running", "pid": pid,
+                        "started_at": _now()})
+        state.write_workers(workers)
     print(wid)
 
 
@@ -93,7 +107,8 @@ def compose_answer_task(original_task: str, answer: str) -> str:
 
 
 def cmd_answer(a) -> None:
-    qfile = state.state_dir() / "questions" / f"{a.worker_id}.md"
+    qdir = state.state_dir() / "questions"
+    qfile = paths.resolve_within(qdir, f"{paths.safe_segment(a.worker_id)}.md")
     original = qfile.read_text() if qfile.exists() else ""
     new_task = compose_answer_task(original, a.answer)
     if qfile.exists():

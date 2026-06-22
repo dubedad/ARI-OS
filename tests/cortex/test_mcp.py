@@ -306,7 +306,7 @@ def test_install_registers_ari_os_cortex_mcp_server(tmp_path: Path,
     assert "ari-os-cortex" in first["mcpServers"]
     assert "vercel" in first["mcpServers"]  # user server preserved
     entry = first["mcpServers"]["ari-os-cortex"]
-    assert entry["command"] == "python3"
+    assert entry["command"] == install.MCP_SERVER_COMMAND
     assert "ari_os.tools.cortex.mcp_server" in entry["args"]
 
     # Idempotency: re-run, entry is replaced in place (not duplicated).

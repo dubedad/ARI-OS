@@ -29,11 +29,11 @@ def test_writes_all_harness_configs(tmp_path, monkeypatch):
 
     claude = json.loads(Path(written["claude"]).read_text())
     assert "ari-os-cortex" in claude["mcpServers"]
-    assert claude["mcpServers"]["ari-os-cortex"]["command"] == "python3"
+    assert claude["mcpServers"]["ari-os-cortex"]["command"] == install.MCP_SERVER_COMMAND
 
     codex = tomllib.loads(Path(written["codex"]).read_text())
     assert codex["mcp_servers"]["existing"]["command"] == "node"
-    assert codex["mcp_servers"]["ari-os-cortex"]["command"] == "python3"
+    assert codex["mcp_servers"]["ari-os-cortex"]["command"] == install.MCP_SERVER_COMMAND
     assert codex["mcp_servers"]["ari-os-cortex"]["args"] == [
         "-m",
         "ari_os.tools.cortex.mcp_server",

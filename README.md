@@ -96,6 +96,10 @@ taste, and deciding what "done" means.
   tips while you learn).
 - **Dispatch** spawns a detached worker from a brief and tracks it. It refuses to
   run at a repo root and has a read-only mode, so a worker cannot wander.
+  By default, those Claude workers include `--dangerously-skip-permissions` so
+  long-running background jobs do not stall on interactive permission prompts.
+  This is powerful and should only be used with briefs and worktrees you trust.
+  Set `ARI_OS_WORKER_SKIP_PERMISSIONS=0` to omit that flag.
 - **Monitor** is a tiny local web dashboard styled like classic Mac OS. It shows
   every worker as running, blocked, or done, surfaces any questions they have,
   and lets you recolor the background.
@@ -193,7 +197,7 @@ running a crew, not waiting on a queue of one.
 
 ```
 ┌─ INSTALL ────────────────────────────────────────────────┐
-│ python3 install.py        easy wizard                    │
+│ python3 -m ari_os.install easy wizard                    │
 │ read SETUP.md             advanced / by hand             │
 │                                                          │
 │ backed up · reversible · idempotent                      │
@@ -202,7 +206,7 @@ running a crew, not waiting on a queue of one.
 
 ```bash
 uv pip install -e .         # install dependencies (or: pip install -e .)
-python3 install.py          # wire into Claude Code + stand up the brain
+python3 -m ari_os.install   # wire into Claude Code + stand up the brain
 ```
 
 It copies the skills and commands into your Claude Code directory, registers a
@@ -227,7 +231,19 @@ and merged, never overwritten. See **[SETUP.md](SETUP.md)** for the manual path.
 ```bash
 python3 -m ari_os.tools.arios keys
 python3 -m ari_os.tools.arios theme stipple
+python3 -m ari_os.tools.arios cortex status
+python3 -m ari_os.tools.arios cortex embeddings auto
+python3 -m ari_os.tools.arios cortex mode default
+python3 -m ari_os.tools.arios cortex wander on
+python3 -m ari_os.tools.arios cortex ears off
+python3 -m ari_os.tools.arios cortex lens off
 ```
+
+`arios cortex status` prints the saved Cortex settings. `arios cortex
+embeddings <auto|google|ollama|off>` selects the embedding provider preference.
+`arios cortex mode <name>` sets the active cognitive mode. `arios cortex wander
+<on|off>` controls tangential recall, while `arios cortex ears <on|off>` and
+`arios cortex lens <on|off>` toggle optional audio and video ingest.
 
 ## Tuning your brain
 
@@ -250,9 +266,9 @@ with `... cortex mode set <name>`, or customize the bundled YAML files in
 
 ```
 ┌─ LIFECYCLE ──────────────────────────────────────────────┐
-│ install.py --update     refresh; keeps keys + config     │
-│ install.py --revert     undo the last change             │
-│ install.py --uninstall  remove everything               │
+│ python3 -m ari_os.install --update     refresh           │
+│ python3 -m ari_os.install --revert     undo last change  │
+│ python3 -m ari_os.install --uninstall  remove everything │
 └──────────────────────────────────────────────────────────┘
 ```
 

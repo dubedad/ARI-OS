@@ -25,9 +25,7 @@ def load_config() -> dict:
 
 
 def save_config(cfg: dict) -> None:
-    p = _config_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(cfg, indent=2))
+    paths.write_private(_config_path(), json.dumps(cfg, indent=2))
 
 
 def set_theme(name: str) -> None:

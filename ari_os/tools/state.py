@@ -4,15 +4,18 @@ Default ~/.ari-os, overridable with $ARI_OS_HOME (used by tests and by users
 who want a custom location). Creates logs/ and questions/ on first access.
 """
 from __future__ import annotations
+from contextlib import contextmanager
+import fcntl
 import json, os
 from pathlib import Path
+from .. import paths
 
 
 def state_dir() -> Path:
     base = os.environ.get("ARI_OS_HOME") or os.path.expanduser("~/.ari-os")
-    d = Path(base)
-    (d / "logs").mkdir(parents=True, exist_ok=True)
-    (d / "questions").mkdir(parents=True, exist_ok=True)
+    d = paths.ensure_private_dir(base)
+    paths.ensure_private_dir(d / "logs")
+    paths.ensure_private_dir(d / "questions")
     return d
 
 
@@ -31,7 +34,24 @@ def read_workers() -> list[dict]:
 
 
 def write_workers(workers: list[dict]) -> None:
-    workers_path().write_text(json.dumps(workers, indent=2))
+    paths.write_private(workers_path(), json.dumps(workers, indent=2))
+
+
+@contextmanager
+def locked():
+    """Exclusive lock around workers.json read-modify-write sections."""
+    lock = state_dir() / "workers.lock"
+    fd = os.open(lock, os.O_WRONLY | os.O_CREAT, 0o600)
+    with os.fdopen(fd, "w") as f:
+        try:
+            lock.chmod(0o600)
+        except OSError:
+            pass
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
 def pid_alive(pid) -> bool:
@@ -54,7 +74,14 @@ def reconcile(workers: list[dict] | None = None) -> list[dict]:
     """Update worker statuses from reality: an open question -> blocked,
     a dead PID -> done, otherwise running. Persists if anything changed."""
     if workers is None:
-        workers = read_workers()
+        with locked():
+            workers = read_workers()
+            return _reconcile_unlocked(workers, persist=True)
+    with locked():
+        return _reconcile_unlocked(workers, persist=True)
+
+
+def _reconcile_unlocked(workers: list[dict], persist: bool) -> list[dict]:
     open_q = _open_questions()
     changed = False
     for w in workers:
@@ -69,6 +96,6 @@ def reconcile(workers: list[dict] | None = None) -> list[dict]:
         if new != w.get("status"):
             w["status"] = new
             changed = True
-    if changed:
+    if changed and persist:
         write_workers(workers)
     return workers

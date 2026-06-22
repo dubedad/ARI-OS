@@ -6,8 +6,9 @@ cheap executor for non-file text work (drafts, research, second opinions).
 """
 from __future__ import annotations
 import argparse, json, os, subprocess, sys
-from urllib.request import Request, urlopen
+from urllib.request import Request
 from urllib.error import HTTPError
+from . import _http
 
 KEYCHAIN_SERVICE = "com.ari-os.keys"
 ENV_VARS = {
@@ -61,7 +62,7 @@ def call_anthropic(key, model_id, prompt, system):
                   data=json.dumps(body).encode(),
                   headers={"Content-Type": "application/json", "x-api-key": key,
                            "anthropic-version": "2023-06-01"})
-    with urlopen(req, timeout=300) as r:
+    with _http.open_url(req, timeout=300) as r:
         res = json.loads(r.read())
     return "\n".join(b["text"] for b in res.get("content", []) if b.get("type") == "text") or "(empty)"
 
@@ -73,15 +74,17 @@ def call_openai_compat(key, model_id, prompt, system, base_url):
                                    "max_tokens": 8192}).encode(),
                   headers={"Content-Type": "application/json",
                            "Authorization": f"Bearer {key}"})
-    with urlopen(req, timeout=300) as r:
+    with _http.open_url(req, timeout=300) as r:
         return json.loads(r.read())["choices"][0]["message"]["content"]
 
 def call_google(key, model_id, prompt, system):
     body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
     if system: body["systemInstruction"] = {"parts": [{"text": system}]}
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={key}"
-    with urlopen(Request(url, data=json.dumps(body).encode(),
-                         headers={"Content-Type": "application/json"}), timeout=300) as r:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent"
+    req = Request(url, data=json.dumps(body).encode(),
+                  headers={"Content-Type": "application/json",
+                           "x-goog-api-key": key})
+    with _http.open_url(req, timeout=300) as r:
         res = json.loads(r.read())
     cands = res.get("candidates", [])
     return "".join(p.get("text", "") for p in cands[0]["content"]["parts"]) if cands else "(no candidates)"
@@ -89,10 +92,10 @@ def call_google(key, model_id, prompt, system):
 def call_ollama(model_id, prompt, system):
     msgs = ([{"role": "system", "content": system}] if system else []) + \
            [{"role": "user", "content": prompt}]
-    with urlopen(Request("http://localhost:11434/api/chat",
-                         data=json.dumps({"model": model_id, "messages": msgs,
-                                          "stream": False}).encode(),
-                         headers={"Content-Type": "application/json"}), timeout=600) as r:
+    with _http.open_url(Request("http://localhost:11434/api/chat",
+                                data=json.dumps({"model": model_id, "messages": msgs,
+                                                 "stream": False}).encode(),
+                                headers={"Content-Type": "application/json"}), timeout=600) as r:
         return json.loads(r.read()).get("message", {}).get("content", "(empty)")
 
 def call_model(name: str, prompt: str, system: str | None) -> str:

@@ -170,14 +170,15 @@ def _api_embed_one(text: str, *, model: str, dim: int, timeout: float = 30.0) ->
     """
     from ari_os.tools.ask import get_key  # late import: ask is a sibling tool
     key = get_key("google")
-    url = f"{_API_ENDPOINT.format(model=model)}?key={key}"
+    url = _API_ENDPOINT.format(model=model)
     body = {
         "model": f"models/{model}",
         "content": {"parts": [{"text": text}]},
         "outputDimensionality": dim,
     }
     try:
-        r = httpx.post(url, json=body, timeout=timeout)
+        r = httpx.post(url, json=body, timeout=timeout,
+                       headers={"x-goog-api-key": key})
         r.raise_for_status()
     except httpx.HTTPError as e:
         raise EmbedError(f"api embed call failed: {e}") from e

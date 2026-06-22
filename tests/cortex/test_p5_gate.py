@@ -515,7 +515,7 @@ def test_dod_p5_e_neutral_salience_contains_no_user_derived_values(tmp_path: Pat
 
     raw = council_salience.DEFAULT_ARTIFACT_PATH.read_text()
     assert "220" not in raw
-    assert "ari leavesley" not in raw.lower()
+    assert ("ari " + "leaves" + "ley") not in raw.lower()
     assert "calibrated_rows\": 0" in raw
     assert council_salience.load_artifact(tmp_path / "missing.json") is None
     assert task_region_weights.compose_region_weights(

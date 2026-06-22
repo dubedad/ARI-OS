@@ -7,7 +7,8 @@ and returns None when nothing is configured so recall stays lexical. No pip deps
 """
 from __future__ import annotations
 import json, math, os
-from urllib.request import Request, urlopen
+from urllib.request import Request
+from . import _http
 
 def cosine(a, b) -> float:
     num = sum(x * y for x, y in zip(a, b))
@@ -18,7 +19,7 @@ def cosine(a, b) -> float:
 
 def _ollama_up() -> bool:
     try:
-        urlopen("http://localhost:11434/api/tags", timeout=1).read()
+        _http.open_url(Request("http://localhost:11434/api/tags"), timeout=1).read()
         return True
     except Exception:
         return False
@@ -43,15 +44,16 @@ def _embed_ollama(text, model="nomic-embed-text"):
     req = Request("http://localhost:11434/api/embeddings",
                   data=json.dumps({"model": model, "prompt": text}).encode(),
                   headers={"Content-Type": "application/json"})
-    with urlopen(req, timeout=60) as r:
+    with _http.open_url(req, timeout=60) as r:
         return json.loads(r.read()).get("embedding")
 
 def _embed_google(text, key, model="text-embedding-004"):
-    url = (f"https://generativelanguage.googleapis.com/v1beta/models/{model}"
-           f":embedContent?key={key}")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent"
     body = {"model": f"models/{model}", "content": {"parts": [{"text": text}]}}
-    with urlopen(Request(url, data=json.dumps(body).encode(),
-                         headers={"Content-Type": "application/json"}), timeout=60) as r:
+    req = Request(url, data=json.dumps(body).encode(),
+                  headers={"Content-Type": "application/json",
+                           "x-goog-api-key": key})
+    with _http.open_url(req, timeout=60) as r:
         return json.loads(r.read()).get("embedding", {}).get("values")
 
 def embed(text, provider="auto"):

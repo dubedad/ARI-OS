@@ -10,11 +10,10 @@ def test_worker_id_shape():
 
 def test_build_argv_basic():
     argv = dispatch.build_claude_argv(
-        executor="sonnet", task="do the thing",
+        executor="sonnet",
         cwd="/work/proj", add_dirs=["/work/extra"], read_only=False)
     assert argv[0] == "claude"
     assert "-p" in argv
-    assert "do the thing" in argv
     assert "--model" in argv and "sonnet" in argv
     assert "--add-dir" in argv and "/work/extra" in argv
     assert "--dangerously-skip-permissions" in argv
@@ -22,7 +21,7 @@ def test_build_argv_basic():
 
 def test_build_argv_read_only_strips_write_tools():
     argv = dispatch.build_claude_argv(
-        executor="haiku", task="review", cwd="/p", add_dirs=[], read_only=True)
+        executor="haiku", cwd="/p", add_dirs=[], read_only=True)
     joined = " ".join(argv)
     assert "--disallowed-tools" in argv
     assert "Write" in joined and "Edit" in joined

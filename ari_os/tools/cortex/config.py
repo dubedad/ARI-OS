@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from ... import paths
 
 # --- Embedding defaults (overridable via env) -------------------------------
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
@@ -86,10 +87,10 @@ def set_config_value(dotted_key: str, value) -> Path:
     paths in ``_config_value`` and cortex LLM checks, which check flat keys first.
     """
     path = state_home() / "config.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    paths.ensure_private_dir(path.parent)
     data = runtime_config()
     data[dotted_key] = value
-    path.write_text(json.dumps(data, indent=2))
+    paths.write_private(path, json.dumps(data, indent=2))
     return path
 
 

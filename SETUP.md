@@ -1,9 +1,9 @@
 # ARI-OS — Advanced Setup (manual path)
 
-Prefer the wizard? Run `python3 install.py` and skip this file. This is the
+Prefer the wizard? Run `python3 -m ari_os.install` and skip this file. This is the
 do-it-by-hand path: hand it to your assistant ("read SETUP.md and set this up")
-or follow it yourself. It mirrors exactly what `install.py` does — with the same
-safety rules.
+or follow it yourself. It mirrors exactly what the installer does — with the
+same safety rules.
 
 ## Dependencies
 
@@ -46,8 +46,8 @@ override with `ARI_OS_CLAUDE_DIR`) and keeps its own state under `~/.ari-os`
   existing file into `~/.ari-os/backups/<timestamp>/`.
 - **Record what you changed** in `~/.ari-os/installed.json` so it can be undone.
 - **Idempotent.** Running setup twice changes nothing the second time.
-- **Reversible.** `python3 install.py --revert` undoes the last change;
-  `--uninstall` removes everything ARI-OS added.
+- **Reversible.** `python3 -m ari_os.install --revert` undoes the last change;
+  `python3 -m ari_os.install --uninstall` removes everything ARI-OS added.
 
 ## Keys
 
