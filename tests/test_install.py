@@ -136,8 +136,8 @@ def test_install_bootstraps_heavy_brain(tmp_path, monkeypatch):
     mcp = json.loads((cdir / ".mcp.json").read_text())
     assert "ari-os-cortex" in mcp["mcpServers"]
     settings = json.loads((cdir / "settings.json").read_text())
-    hooks = settings["hooks"]["SessionStart"]
-    assert any("ari_os.hooks.session_start_cortex" in h["command"] for h in hooks)
+    cmds = install.iter_session_start_commands(settings)
+    assert any("ari_os.hooks.session_start_cortex" in c for c in cmds)
 
     install.revert()
     assert claude_md.read_text() == "my rules\n"

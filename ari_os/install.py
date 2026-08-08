@@ -23,8 +23,9 @@ CLAUDE_BODY = ("# ARI-OS\n"
                "Orchestrator-first workflow: brainstorm -> plan -> dispatch "
                "background workers -> watch -> review -> ship.\n"
                "Skills: brainstorm, handoff, advisor, teach, remember, recall, dream. "
-               "Memory: `python3 -m ari_os.tools.cortex recall \"<query>\"` / "
-               "`remember \"<note>\"`. Routines: /morning, /night. "
+               "Memory: `/recall` + `/remember` in session; from a shell, "
+               "`python3 -m ari_os.tools.cortex retrieve -q \"<query>\"` and "
+               "`... ingest --path <file>`. Routines: /morning, /night. "
                "Monitor: `python3 -m ari_os.tools.monitor`.")
 
 SUPPORTED_TARGETS = ("claude", "codex", "gemini", "kimi", "custom")
@@ -206,6 +207,11 @@ _ARI_OS_ROOT = str(Path(__file__).resolve().parent.parent)
 MCP_SERVER_COMMAND = sys.executable or "python3"
 MCP_SERVER_ENV = {"PYTHONPATH": _ARI_OS_ROOT}
 
+# Same reasoning as the hook: a bare "python3" resolves to whatever is first on
+# the harness's PATH, which is usually not the interpreter ARI-OS was installed
+# into — the status line then dies with ModuleNotFoundError on every render.
+STATUSLINE_COMMAND = f"{MCP_SERVER_COMMAND} -m ari_os.tools.statusline"
+
 
 def _mcp_server_entry() -> dict:
     """The single ARI-OS Cortex MCP server entry we own (stdio transport)."""
@@ -264,7 +270,16 @@ def _write_mcp_servers_with_backup(register: bool = True) -> tuple[Path, Path | 
         paths.ensure_private_dir(cd)
     except OSError:
         return None
-    mcp_json = cd / ".mcp.json"
+    mcp_json = _claude_mcp_path(cd)
+    if mcp_json is None:
+        print(
+            "claude: skipped MCP registration — a user-scoped server belongs in "
+            "~/.claude.json, not a file this installer should merge. Register it "
+            "with: claude mcp add --scope user ari-os-cortex -- "
+            f"{MCP_SERVER_COMMAND} -m {MCP_SERVER_MODULE} stdio",
+            file=sys.stderr,
+        )
+        return None
     existing: dict = {}
     if mcp_json.exists():
         try:
@@ -277,6 +292,32 @@ def _write_mcp_servers_with_backup(register: bool = True) -> tuple[Path, Path | 
     except OSError:
         return None
     return mcp_json, b
+
+
+def _claude_mcp_path(claude_dir: Path) -> Path | None:
+    """Where Claude Code actually reads a project MCP config from.
+
+    Claude Code reads project-scoped servers from ``.mcp.json`` at the *project
+    root* — not from inside ``.claude/``. So for a workspace-scoped install
+    (``ARI_OS_CLAUDE_DIR=<project>/.claude``) the file belongs one level up.
+
+    For a global install (``~/.claude``) there is no project root, and the
+    user-scope equivalent lives in ``~/.claude.json`` alongside unrelated
+    state we must not rewrite. Return ``None`` so the caller can tell the user
+    to register it with the CLI instead.
+    """
+    claude_dir = Path(claude_dir)
+    if claude_dir.name != ".claude":
+        # A non-standard root (custom dir, test fixture): we cannot infer a
+        # project root above it, so keep the file with the config it belongs to.
+        return claude_dir / ".mcp.json"
+    parent = claude_dir.parent
+    try:
+        if parent.resolve() == Path.home().resolve():
+            return None
+    except OSError:
+        return None
+    return parent / ".mcp.json"
 
 
 def write_mcp_servers(register: bool = True) -> Path | None:
@@ -523,7 +564,16 @@ def unregister_mcp_server() -> bool:
     Non-ARI-OS entries are preserved.
     """
     cd = paths.claude_dir()
-    removed = _unregister_json_mcp_server(cd / ".mcp.json")
+    # Must mirror _claude_mcp_path, or uninstall silently leaves behind the
+    # very file the installer wrote. Legacy installs put it inside .claude/,
+    # so clean both locations.
+    removed = False
+    claude_mcp = _claude_mcp_path(cd)
+    if claude_mcp is not None:
+        removed = _unregister_json_mcp_server(claude_mcp)
+    legacy = cd / ".mcp.json"
+    if legacy != claude_mcp:
+        removed = _unregister_json_mcp_server(legacy) or removed
     removed = _unregister_codex_mcp_server() or removed
     removed = _unregister_gemini_mcp_server() or removed
     removed = _unregister_kimi_mcp_server() or removed
@@ -540,12 +590,25 @@ SESSION_START_HOOK_MARKER = "# ari-os-session-start"
 
 
 def _session_start_hook_entry() -> dict:
-    """The single ARI-OS SessionStart command hook entry we own."""
-    cmd = f"{SESSION_START_HOOK_MARKER} python3 -m ari_os.hooks.session_start_cortex"
+    """The single ARI-OS SessionStart command hook entry we own.
+
+    The marker is a *trailing* shell comment. Leading it would comment out the
+    whole command, so the hook would exit 0 having done nothing — silently
+    disabling brain context on session start. ``sys.executable`` is used rather
+    than a bare ``python3`` so the hook resolves to the interpreter ARI-OS was
+    installed into, not whatever happens to be first on the harness's PATH.
+    """
+    cmd = f"{MCP_SERVER_COMMAND} -m ari_os.hooks.session_start_cortex {SESSION_START_HOOK_MARKER}"
+    # Harnesses expect a matcher group wrapping the handlers, not a bare
+    # command object in the event array. A bare object is silently ignored.
     return {
-        "type": "command",
-        "command": cmd,
-        "timeout": 15,
+        "hooks": [
+            {
+                "type": "command",
+                "command": cmd,
+                "timeout": 15,
+            }
+        ]
     }
 
 
@@ -560,11 +623,46 @@ def _strip_ari_os_session_start(hooks_list: list) -> list:
         if not isinstance(entry, dict):
             kept.append(entry)
             continue
-        cmd = entry.get("command", "")
-        if "ari_os.hooks.session_start_cortex" in cmd:
+        # Legacy shape: a bare command object sitting in the event array.
+        if _is_ari_os_command(entry):
             continue
+        # Current shape: a matcher group whose handlers we may own. Drop the
+        # whole group only when we own every handler in it; otherwise keep the
+        # group and strip just our handler, so user hooks sharing a group live.
+        handlers = entry.get("hooks")
+        if isinstance(handlers, list):
+            survivors = [h for h in handlers if not _is_ari_os_command(h)]
+            if not survivors:
+                continue
+            if len(survivors) != len(handlers):
+                entry = {**entry, "hooks": survivors}
         kept.append(entry)
     return kept
+
+
+def iter_session_start_commands(settings: dict) -> list[str]:
+    """Every SessionStart command string in a settings dict, any shape.
+
+    Handles both the matcher-group form harnesses require and the legacy bare
+    command objects older ARI-OS installs wrote directly into the event array.
+    """
+    out: list[str] = []
+    for entry in (settings.get("hooks") or {}).get("SessionStart") or []:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("command"):
+            out.append(entry["command"])
+        for handler in entry.get("hooks") or []:
+            if isinstance(handler, dict) and handler.get("command"):
+                out.append(handler["command"])
+    return out
+
+
+def _is_ari_os_command(entry) -> bool:
+    """True when a hook handler invokes the ARI-OS SessionStart module."""
+    if not isinstance(entry, dict):
+        return False
+    return "ari_os.hooks.session_start_cortex" in (entry.get("command") or "")
 
 
 def _repo_root() -> Path:
@@ -649,21 +747,30 @@ def apply(
     bootstrap_brain: bool = True,
     target: str | None = None,
     custom_dir: str | os.PathLike | None = None,
+    register_global_harnesses: bool = False,
 ):
     spec = resolve_agent_target(target, custom_dir)
     if dry_run:
         # MCP registration: even in dry-run we report intent.
         if register_mcp:
             if spec.name == "claude":
-                mcp_paths = {
-                    "claude": str(paths.claude_dir() / ".mcp.json"),
-                }
-                codex_dir = _config_dir("CODEX_HOME", "~/.codex", create_explicit=False)
-                if codex_dir is not None:
-                    mcp_paths["codex"] = str(codex_dir / "config.toml")
-                gemini_dir = _config_dir("GEMINI_DIR", "~/.gemini", create_explicit=False)
-                if gemini_dir is not None:
-                    mcp_paths["gemini"] = str(gemini_dir / "settings.json")
+                # Mirror the real path exactly: same destination resolution,
+                # same global opt-in gate. A dry run that reports destinations
+                # the install will not touch is worse than no dry run at all.
+                mcp_paths = {}
+                claude_mcp = _claude_mcp_path(paths.claude_dir())
+                if claude_mcp is not None:
+                    mcp_paths["claude"] = str(claude_mcp)
+                if register_global_harnesses:
+                    codex_dir = _config_dir("CODEX_HOME", "~/.codex", create_explicit=False)
+                    if codex_dir is not None:
+                        mcp_paths["codex"] = str(codex_dir / "config.toml")
+                    gemini_dir = _config_dir("GEMINI_DIR", "~/.gemini", create_explicit=False)
+                    if gemini_dir is not None:
+                        mcp_paths["gemini"] = str(gemini_dir / "settings.json")
+                    kimi_dir = _config_dir("KIMI_CODE_HOME", "~/.kimi-code", create_explicit=False)
+                    if kimi_dir is not None:
+                        mcp_paths["kimi"] = str(kimi_dir / "mcp.json")
             elif spec.supports_mcp:
                 target_mcp = {
                     "codex": spec.root / "config.toml",
@@ -673,8 +780,9 @@ def apply(
                 mcp_paths = {spec.name: str(target_mcp[spec.name])}
             else:
                 mcp_paths = {}
+            # Pairs only: main() unpacks every reported item as (kind, dest).
             return [(k, str(dst)) for (k, _src, dst) in actions] + [
-                (f"mcp:{harness}", MCP_SERVER_MODULE, path)
+                (f"mcp:{harness}", str(path))
                 for harness, path in mcp_paths.items()
             ]
         return [(k, str(dst)) for (k, _src, dst) in actions]
@@ -691,7 +799,7 @@ def apply(
             existing = json.loads(dst.read_text()) if dst.exists() else {}
             _write_json_private(
                 dst,
-                merge_settings_with_hooks(existing, "python3 -m ari_os.tools.statusline"),
+                merge_settings_with_hooks(existing, STATUSLINE_COMMAND),
             )
         elif kind in ("claude_md", "instruction"):
             text = dst.read_text() if dst.exists() else ""
@@ -701,9 +809,19 @@ def apply(
             extra["target_root"] = str(spec.root)
         _record_change(changes, dst, b, **extra)
     # MCP server registration (default on; opt out with --no-mcp).
+    #
+    # Scope rule: register ONLY the harness being installed into. Writing to
+    # every harness on the machine turns a workspace-scoped install into a
+    # global one behind the user's back, so it now requires an explicit
+    # --register-global-harnesses opt-in.
     if register_mcp:
-        if spec.name == "claude":
+        if spec.name == "claude" and register_global_harnesses:
             _write_all_mcp_registrations_recorded(changes)
+        elif spec.name == "claude":
+            result = _write_mcp_servers_with_backup(register=True)
+            if result is not None:
+                mcp_path, b = result
+                _record_change(changes, mcp_path, b, kind="mcp", harness="claude")
         elif spec.supports_mcp:
             _write_target_mcp_registration_recorded(changes, spec)
     if bootstrap_brain:
@@ -809,8 +927,11 @@ def update(
     register_mcp: bool = True,
     target: str | None = None,
     custom_dir: str | os.PathLike | None = None,
+    register_global_harnesses: bool = False,
 ) -> None:
     # Re-apply from the repo; config.json + keychain keys are never touched.
+    # register_global_harnesses defaults off so an update can never silently
+    # widen the scope of an existing workspace-scoped install.
     apply(
         plan_actions(_repo_root(), target=target, custom_dir=custom_dir),
         dry_run=False,
@@ -818,6 +939,7 @@ def update(
         bootstrap_brain=False,
         target=target,
         custom_dir=custom_dir,
+        register_global_harnesses=register_global_harnesses,
     )
     try:
         from ari_os.tools.cortex.config import brain_db_path
@@ -850,7 +972,20 @@ def main() -> None:
                     help="Agent harness to install into. Defaults to ARI_OS_AGENT_TARGET or claude.")
     ap.add_argument("--dir",
                     help="Config root for --target custom.")
+    ap.add_argument("--register-global-harnesses", action="store_true",
+                    help="DANGEROUS, MACHINE-WIDE: also register the Cortex MCP "
+                         "server in EVERY other agent harness on this machine "
+                         "(~/.codex/config.toml, ~/.gemini/settings.json, "
+                         "~/.kimi-code/mcp.json), outside the install target. "
+                         "Off by default: an install stays inside the directory "
+                         "you point it at.")
     a = ap.parse_args()
+    if a.register_global_harnesses:
+        print(
+            "WARNING: --register-global-harnesses will edit agent config files "
+            "OUTSIDE your install target, for every project on this machine.",
+            file=sys.stderr,
+        )
     try:
         target = resolve_agent_target(a.target, a.dir)
     except ValueError as exc:
@@ -865,13 +1000,15 @@ def main() -> None:
         print("ARI-OS uninstalled.")
         return
     if a.update:
-        update(register_mcp=register_mcp, target=target.name, custom_dir=a.dir)
+        update(register_mcp=register_mcp, target=target.name, custom_dir=a.dir,
+               register_global_harnesses=a.register_global_harnesses)
         print("ARI-OS updated.")
         return
     actions = apply(
         plan_actions(_repo_root(), target=target.name, custom_dir=a.dir),
         dry_run=a.dry_run,
         register_mcp=register_mcp,
+        register_global_harnesses=a.register_global_harnesses,
         llm=a.llm,
         ears=a.ears,
         lens=a.lens,

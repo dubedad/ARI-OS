@@ -243,8 +243,8 @@ def test_dod1_install_stands_up_heavy_brain(
     assert "ari-os-cortex" in mcp["mcpServers"]
 
     settings = json.loads((claude_dir / "settings.json").read_text())
-    hooks = settings["hooks"]["SessionStart"]
-    assert any("ari_os.hooks.session_start_cortex" in h["command"] for h in hooks)
+    cmds = install.iter_session_start_commands(settings)
+    assert any("ari_os.hooks.session_start_cortex" in c for c in cmds)
     assert config._config_value("cortex.llm") == "ollama"
 
 

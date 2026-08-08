@@ -211,9 +211,10 @@ def test_installer_registers_session_start_hook(tmp_path, monkeypatch):
 
     install.apply(install.plan_actions(repo), dry_run=False)
     settings = json.loads((cdir / "settings.json").read_text())
-    ss = settings.get("hooks", {}).get("SessionStart", [])
-    assert any("ari_os.hooks.session_start_cortex" in h.get("command", "")
-               for h in ss)
+    cmds = install.iter_session_start_commands(settings)
+    assert any("ari_os.hooks.session_start_cortex" in c for c in cmds)
+    # The command must be runnable, not swallowed by a leading shell comment.
+    assert all(not c.lstrip().startswith("#") for c in cmds)
 
 
 def test_installer_reinstall_is_idempotent(tmp_path, monkeypatch):
@@ -232,8 +233,8 @@ def test_installer_reinstall_is_idempotent(tmp_path, monkeypatch):
     install.apply(install.plan_actions(repo), dry_run=False)
     install.apply(install.plan_actions(repo), dry_run=False)
     settings = json.loads((cdir / "settings.json").read_text())
-    ss = settings.get("hooks", {}).get("SessionStart", [])
-    ari_entries = [h for h in ss if "ari_os.hooks.session_start_cortex" in h.get("command", "")]
+    cmds = install.iter_session_start_commands(settings)
+    ari_entries = [c for c in cmds if "ari_os.hooks.session_start_cortex" in c]
     assert len(ari_entries) == 1
 
 

@@ -290,7 +290,9 @@ def test_install_registers_ari_os_cortex_mcp_server(tmp_path: Path,
 
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir()
-    user_mcp = claude_dir / ".mcp.json"
+    # Claude Code reads project MCP config from the project root, one level
+    # above .claude/ — see install._claude_mcp_path.
+    user_mcp = tmp_path / ".mcp.json"
     user_mcp.write_text(json.dumps({
         "mcpServers": {
             "vercel": {"type": "http", "url": "https://mcp.vercel.com/sse"},

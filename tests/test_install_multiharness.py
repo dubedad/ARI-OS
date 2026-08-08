@@ -25,7 +25,10 @@ def test_writes_all_harness_configs(tmp_path, monkeypatch):
 
     written = install.write_all_mcp_registrations(register=True)
 
-    assert set(written) == {"claude", "codex", "gemini"}
+    # Only assert the harnesses this test set up. Others (e.g. kimi) depend on
+    # what exists on the host, and asserting equality made this test pass or
+    # fail based on the developer's own machine.
+    assert {"claude", "codex", "gemini"} <= set(written)
 
     claude = json.loads(Path(written["claude"]).read_text())
     assert "ari-os-cortex" in claude["mcpServers"]
