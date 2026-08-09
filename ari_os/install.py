@@ -19,14 +19,20 @@ START = "<!-- ARI-OS:start -->"
 END = "<!-- ARI-OS:end -->"
 _BLOCK_RE = re.compile(re.escape(START) + r".*?" + re.escape(END), re.DOTALL)
 
+# The interpreter ARI-OS is installed into. Every command we write into a
+# config file or an instruction block must name it explicitly: a bare "python3"
+# resolves to whatever is first on the reader's PATH, which usually does not
+# have ari_os importable — so the documented commands fail when copied.
+ARI_OS_PYTHON = sys.executable or "python3"
+
 CLAUDE_BODY = ("# ARI-OS\n"
                "Orchestrator-first workflow: brainstorm -> plan -> dispatch "
                "background workers -> watch -> review -> ship.\n"
                "Skills: brainstorm, handoff, advisor, teach, remember, recall, dream. "
                "Memory: `/recall` + `/remember` in session; from a shell, "
-               "`python3 -m ari_os.tools.cortex retrieve -q \"<query>\"` and "
+               f"`{ARI_OS_PYTHON} -m ari_os.tools.cortex retrieve -q \"<query>\"` and "
                "`... ingest --path <file>`. Routines: /morning, /night. "
-               "Monitor: `python3 -m ari_os.tools.monitor`.")
+               f"Monitor: `{ARI_OS_PYTHON} -m ari_os.tools.monitor`.")
 
 SUPPORTED_TARGETS = ("claude", "codex", "gemini", "kimi", "custom")
 
@@ -204,7 +210,7 @@ MCP_SERVER_ARGS = ["-m", MCP_SERVER_MODULE, "stdio"]
 # Use the interpreter that ran the installer: it has ari_os + the heavy deps
 # (mcp, sqlite_vec, scikit-learn). PYTHONPATH keeps the editable source importable.
 _ARI_OS_ROOT = str(Path(__file__).resolve().parent.parent)
-MCP_SERVER_COMMAND = sys.executable or "python3"
+MCP_SERVER_COMMAND = ARI_OS_PYTHON
 MCP_SERVER_ENV = {"PYTHONPATH": _ARI_OS_ROOT}
 
 # Same reasoning as the hook: a bare "python3" resolves to whatever is first on

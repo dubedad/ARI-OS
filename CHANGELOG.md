@@ -45,10 +45,12 @@ affect every install, not just the scoped case.
 - **`mcp` was unbounded.** `mcp>=1.0` resolved to 2.0, which removed
   `mcp.server.FastMCP` — a fresh install produced a memory server that could not
   start. Now `mcp>=1.0,<2`.
-- **The installed `CLAUDE.md` block documented CLI commands that do not exist.**
-  It told agents to run `cortex recall` / `remember`; the Cortex CLI provides
-  `ingest` and `retrieve -q`. (`/recall` and `/remember` as slash commands are
-  real and unchanged.)
+- **The installed `CLAUDE.md` block documented commands that do not run.** It
+  told agents to invoke `cortex recall` / `remember`, which are not CLI verbs —
+  the Cortex CLI provides `ingest` and `retrieve -q` — and to run them under a
+  bare `python3`, which usually cannot import `ari_os`. Both corrected; the
+  block now names `sys.executable` via the shared `ARI_OS_PYTHON` constant.
+  (`/recall` and `/remember` as slash commands are real and unchanged.)
 
 ### Fixed — test suite
 

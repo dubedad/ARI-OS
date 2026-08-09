@@ -211,3 +211,28 @@ def test_statusline_uses_a_resolvable_interpreter(workspace):
     assert proc.returncode == 0, proc.stderr[-300:]
     assert "ModuleNotFoundError" not in proc.stderr
     assert proc.stdout.strip(), "status line produced no output"
+
+
+# --- 9. The instruction block must name a runnable interpreter -------------
+
+def test_claude_md_block_commands_are_runnable(workspace):
+    """Commands in the installed CLAUDE.md must work if copied and pasted."""
+    import subprocess
+    import sys
+
+    install.apply(install.plan_actions(REPO), dry_run=False, bootstrap_brain=False)
+    block = (workspace / ".claude" / "CLAUDE.md").read_text()
+    assert "python3 -m ari_os" not in block, (
+        "instruction block tells the reader to run a bare python3, which will "
+        "not have ari_os importable"
+    )
+    assert sys.executable in block
+    # The commands it names must actually exist in the CLI.
+    from ari_os.tools.cortex import cortex as cortex_cli
+    for verb in ("retrieve", "ingest"):
+        assert verb in cortex_cli.main.commands
+    proc = subprocess.run(
+        [sys.executable, "-m", "ari_os.tools.cortex", "retrieve", "--help"],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert proc.returncode == 0, proc.stderr[-300:]
